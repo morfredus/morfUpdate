@@ -8,7 +8,7 @@ Dans le `CMakeLists.txt` de l'application :
 
 ```cmake
 # Dossier voisin (ou third_party/morfUpdate en copie interne)
-add_subdirectory(../morfUpdate_travail morfUpdate EXTERNAL_SOURCE)
+add_subdirectory(../morfUpdate morfUpdate EXTERNAL_SOURCE)
 
 target_link_libraries(SiteWatch PRIVATE
     morfUpdate::morfUpdate   # coeur (obligatoire)
