@@ -28,11 +28,11 @@ avec une UI maison. La couche Widgets fournit un dialogue prêt à l'emploi.
 
 `UpdateChecker` interroge une `IUpdateSource`. Fournie par défaut :
 
-- **`GitHubReleaseSource`** — API GitHub Releases (`/releases/latest`, ou la liste
+- **`GitHubReleaseSource`** - API GitHub Releases (`/releases/latest`, ou la liste
   si on inclut les pré-releases). Jeton optionnel pour dépôts privés / quota.
 
 On peut brancher sa propre source (manifeste JSON auto-hébergé, stub de test…) en
-implémentant `IUpdateSource` — voir l'exemple `StubSource` dans
+implémentant `IUpdateSource` - voir l'exemple `StubSource` dans
 [examples/minimal/main.cpp](examples/minimal/main.cpp).
 
 ## Comparaison de versions
@@ -42,7 +42,7 @@ pré-release comme antérieure à la stable de même numéro (`1.5.0-beta < 1.5.
 
 ## Utilisation
 
-### Le plus simple — vérifier et notifier (UI)
+### Le plus simple - vérifier et notifier (UI)
 
 ```cpp
 #include <morfupdate/UpdateDialog.h>
@@ -57,7 +57,7 @@ cfg.currentVersion = SITEWATCH_VERSION;   // macro déjà définie par CMake
 morfupdate::checkAndNotify(this, "SiteWatch", cfg, /*silentIfUpToDate=*/true);
 ```
 
-### Sans UI — piloter soi-même (cœur seul)
+### Sans UI - piloter soi-même (cœur seul)
 
 ```cpp
 #include <morfupdate/UpdateChecker.h>
@@ -109,11 +109,11 @@ mécanisme d'installation automatique n'a de sens qu'accompagné d'une
 
 ## Documentation
 
--   [docs/fr/ARCHITECTURE.md](docs/fr/ARCHITECTURE.md) — les classes (Version, IUpdateSource, GitHubReleaseSource, UpdateChecker, UpdateDialog)
--   [docs/fr/INTEGRATION.md](docs/fr/INTEGRATION.md) — intégrer morfUpdate dans une application
--   [CHANGELOG.md](CHANGELOG.md) — historique des versions
--   [ROADMAP.md](ROADMAP.md) — évolutions prévues
--   [CONTRIBUTING.md](CONTRIBUTING.md) — guide de contribution
+-   [docs/fr/ARCHITECTURE.md](docs/fr/ARCHITECTURE.md) - les classes (Version, IUpdateSource, GitHubReleaseSource, UpdateChecker, UpdateDialog)
+-   [docs/fr/INTEGRATION.md](docs/fr/INTEGRATION.md) - intégrer morfUpdate dans une application
+-   [CHANGELOG.md](CHANGELOG.md) - historique des versions
+-   [ROADMAP.md](ROADMAP.md) - évolutions prévues
+-   [CONTRIBUTING.md](CONTRIBUTING.md) - guide de contribution
 
 > Index : [`docs/fr/`](docs/fr/README.md) (français) · [`docs/en/`](docs/en/README.md) (anglais).
 

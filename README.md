@@ -12,7 +12,7 @@
 SiteWatch, and future tools).
 
 It compares the installed version against the latest published version and
-**notifies** the user — without ever installing anything silently.
+**notifies** the user - without ever installing anything silently.
 
 ## Two separate layers
 
@@ -28,11 +28,11 @@ own UI. The Widgets layer provides a ready-made dialog.
 
 `UpdateChecker` queries an `IUpdateSource`. Provided by default:
 
-- **`GitHubReleaseSource`** — GitHub Releases API (`/releases/latest`, or the list
+- **`GitHubReleaseSource`** - GitHub Releases API (`/releases/latest`, or the list
   when pre-releases are included). Optional token for private repos / rate limit.
 
 You can plug in your own source (self-hosted JSON manifest, test stub…) by
-implementing `IUpdateSource` — see the `StubSource` example in
+implementing `IUpdateSource` - see the `StubSource` example in
 [examples/minimal/main.cpp](examples/minimal/main.cpp).
 
 ## Version comparison
@@ -43,7 +43,7 @@ treats a pre-release as earlier than the stable of the same number
 
 ## Usage
 
-### Simplest — check and notify (UI)
+### Simplest - check and notify (UI)
 
 ```cpp
 #include <morfupdate/UpdateDialog.h>
@@ -58,7 +58,7 @@ cfg.currentVersion = SITEWATCH_VERSION;   // macro already defined by CMake
 morfupdate::checkAndNotify(this, "SiteWatch", cfg, /*silentIfUpToDate=*/true);
 ```
 
-### Without UI — drive it yourself (core only)
+### Without UI - drive it yourself (core only)
 
 ```cpp
 #include <morfupdate/UpdateChecker.h>

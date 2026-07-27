@@ -7,7 +7,7 @@ portable and safe**.
 ## 1. Philosophy
 
 - **Two layers, kept separate.** The core (`morfUpdate::morfUpdate`) never depends
-  on Qt Widgets — it must work in a headless service. Only the optional
+  on Qt Widgets - it must work in a headless service. Only the optional
   `morfUpdate::Widgets` layer pulls Widgets in.
 - **Pluggable by design.** New update sources implement `IUpdateSource`; don't
   hard-wire a provider into `UpdateChecker`.

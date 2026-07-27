@@ -8,11 +8,11 @@ file at the repository root).
 
 ## [Unreleased]
 
-## [0.1.1] — 2026-07-22
+## [0.1.1] - 2026-07-22
 ### Changed
 - Updated integration documentation to use canonical production project paths.
 
-## [0.1.0] — 2026-07-13
+## [0.1.0] - 2026-07-13
 
 ### Added
 - First release of **morfUpdate**, the shared update-check library.

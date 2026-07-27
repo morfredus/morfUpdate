@@ -1,4 +1,4 @@
-# Architecture — morfUpdate
+# Architecture - morfUpdate
 
 Retour à l'[index de la documentation](README.md).
 
@@ -6,7 +6,7 @@ Retour à l'[index de la documentation](README.md).
 
 morfUpdate est découpé en **deux couches** : un cœur sans interface (Qt Core +
 Network) et une couche UI optionnelle (Qt Widgets). Le cœur ne connaît pas les
-Widgets — on peut l'utiliser dans un service, ou avec sa propre UI.
+Widgets - on peut l'utiliser dans un service, ou avec sa propre UI.
 
 ```
 UI (optionnelle)   morfUpdate::Widgets
@@ -56,9 +56,9 @@ une source maison (manifeste auto-hébergé, stub de test).
 Orchestrateur. `checkForUpdates()` demande à la source la dernière version, la
 compare à `currentVersion`, puis émet **l'un** de :
 
-- `updateAvailable(ReleaseInfo)` — une version plus récente existe ;
-- `upToDate(ReleaseInfo)` — déjà à jour ;
-- `checkFailed(QString)` — réseau / parsing / dépôt introuvable.
+- `updateAvailable(ReleaseInfo)` - une version plus récente existe ;
+- `upToDate(ReleaseInfo)` - déjà à jour ;
+- `checkFailed(QString)` - réseau / parsing / dépôt introuvable.
 
 Asynchrone et **non bloquant** : l'UI reste réactive.
 
@@ -69,7 +69,7 @@ Asynchrone et **non bloquant** : l'UI reste réactive.
 Boîte de dialogue « nouvelle version disponible » : version courante vs nouvelle,
 changelog (Markdown rendu par `QTextBrowser`), boutons **Voir la release** /
 **Télécharger** / **Plus tard**. Les boutons **ouvrent le navigateur**
-(`QDesktopServices`) — pas d'installation automatique.
+(`QDesktopServices`) - pas d'installation automatique.
 
 ### `checkAndNotify(...)`
 
