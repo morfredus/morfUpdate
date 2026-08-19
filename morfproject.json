@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "project": { "id": "morfUpdate", "type": "library" },
+  "packaging": { "provider": "none", "targets": {} }
+}
