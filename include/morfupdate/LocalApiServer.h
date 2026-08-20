@@ -32,12 +32,10 @@ private:
     void handle(QTcpSocket* socket, QByteArray method, QByteArray path,
                 QByteArray headers, QByteArray body);
     void reply(QTcpSocket* socket, int code, QByteArray reason, QJsonObject body);
-    bool authorized(const QByteArray& headers) const;
     static bool safeIdentifier(const QString& value);
 
     AgentConfig m_config;
     OperationStore* m_operations;
-    QString m_token;
     QTcpServer* m_server;
 };
 

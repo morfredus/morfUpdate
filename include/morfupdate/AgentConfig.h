@@ -19,10 +19,6 @@ struct AgentTarget {
 struct AgentConfig {
     quint16 httpPort = 8794;
     QString bindAddress = QStringLiteral("127.0.0.1");
-    QString tokenFile;
-    // A GitHub fine-grained token with read-only Contents permission. It is
-    // deliberately a file reference, never a value returned by this API.
-    QString githubTokenFile;
     QHash<QString, AgentTarget> targets;
 
     static bool load(const QString& path, AgentConfig* config, QString* error);

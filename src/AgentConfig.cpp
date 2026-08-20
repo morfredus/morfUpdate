@@ -21,17 +21,13 @@ bool AgentConfig::load(const QString& path, AgentConfig* config, QString* error)
     const QJsonObject root = doc.object();
     const int port = root.value(QStringLiteral("http_port")).toInt(8794);
     const QString bind = root.value(QStringLiteral("bind_address")).toString(QStringLiteral("127.0.0.1"));
-    const QString tokenFile = root.value(QStringLiteral("token_file")).toString();
-    const QString githubTokenFile = root.value(QStringLiteral("github_token_file")).toString();
-    if (port < 1 || port > 65535 || bind != QStringLiteral("127.0.0.1") || tokenFile.isEmpty()) {
-        if (error) *error = QStringLiteral("agent must use loopback and a token file");
+    if (port < 1 || port > 65535 || bind != QStringLiteral("127.0.0.1")) {
+        if (error) *error = QStringLiteral("agent must use loopback");
         return false;
     }
     AgentConfig parsed;
     parsed.httpPort = static_cast<quint16>(port);
     parsed.bindAddress = bind;
-    parsed.tokenFile = tokenFile;
-    parsed.githubTokenFile = githubTokenFile;
     for (const QJsonValue& value : root.value(QStringLiteral("targets")).toArray()) {
         const QJsonObject obj = value.toObject();
         AgentTarget target{obj.value(QStringLiteral("project")).toString(),
@@ -53,10 +49,6 @@ bool AgentConfig::load(const QString& path, AgentConfig* config, QString* error)
         }
 #endif
         parsed.targets.insert(target.project, target);
-    }
-    if (!parsed.targets.isEmpty() && parsed.githubTokenFile.isEmpty()) {
-        if (error) *error = QStringLiteral("configured targets require a GitHub token file");
-        return false;
     }
     *config = std::move(parsed);
     return true;

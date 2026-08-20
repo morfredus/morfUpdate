@@ -2,8 +2,6 @@
 #include "morfupdate/OperationStore.h"
 #include "morfupdate/UpdateOperation.h"
 
-#include <QCryptographicHash>
-#include <QFile>
 #include <QHostAddress>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -49,16 +47,6 @@ LocalApiServer::LocalApiServer(AgentConfig config, OperationStore* operations, Q
 }
 
 bool LocalApiServer::start(QString* error) {
-    QFile tokenFile(m_config.tokenFile);
-    if (!tokenFile.open(QIODevice::ReadOnly)) {
-        if (error) *error = QStringLiteral("cannot read local API token");
-        return false;
-    }
-    m_token = QString::fromUtf8(tokenFile.readAll()).trimmed();
-    if (m_token.size() < 32) {
-        if (error) *error = QStringLiteral("local API token is missing or too short");
-        return false;
-    }
     if (!m_server->listen(QHostAddress::LocalHost, m_config.httpPort)) {
         if (error) *error = m_server->errorString();
         return false;
@@ -96,10 +84,6 @@ void LocalApiServer::handle(QTcpSocket* socket, QByteArray method, QByteArray pa
     if (method == "GET" && path == "/status") {
         reply(socket, 200, "OK", {{"app", "morfUpdate"}, {"state", "ok"},
               {"updates", QJsonObject{{"scope", "local"}}}});
-        return;
-    }
-    if (!authorized(headers)) {
-        reply(socket, 401, "Unauthorized", {{"error", "authentication required"}});
         return;
     }
     if (method == "GET" && path.startsWith("/api/v1/updates/")) {
@@ -145,19 +129,6 @@ void LocalApiServer::reply(QTcpSocket* socket, int code, QByteArray reason, QJso
                   "Content-Type: application/json\r\nCache-Control: no-store\r\n"
                   "Content-Length: " + QByteArray::number(content.size()) + "\r\nConnection: close\r\n\r\n" + content);
     socket->disconnectFromHost();
-}
-
-bool LocalApiServer::authorized(const QByteArray& headers) const {
-    QByteArray value;
-    for (const QByteArray& line : headers.split('\n')) {
-        const QByteArray trimmed = line.trimmed();
-        if (trimmed.toLower().startsWith("authorization:"))
-            value = trimmed.mid(trimmed.indexOf(':') + 1).trimmed();
-    }
-    const QByteArray expected = QByteArray("Bearer ") + m_token.toUtf8();
-    // Hashing fixed-size digests avoids an early-exit comparison of the secret.
-    return QCryptographicHash::hash(value, QCryptographicHash::Sha256)
-        == QCryptographicHash::hash(expected, QCryptographicHash::Sha256);
 }
 
 bool LocalApiServer::safeIdentifier(const QString& value) {

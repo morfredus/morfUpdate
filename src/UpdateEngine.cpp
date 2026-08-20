@@ -30,26 +30,12 @@ QString platformName() {
 #endif
 }
 
-bool readSecret(const QString& path, QByteArray* secret, QString* error) {
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly)) {
-        *error = QStringLiteral("cannot read protected GitHub token: ") + file.errorString();
-        return false;
-    }
-    *secret = file.readAll().trimmed();
-    if (secret->isEmpty()) {
-        *error = QStringLiteral("protected GitHub token is empty");
-        return false;
-    }
-    return true;
-}
-
 QByteArray get(const QUrl& url, const QByteArray& token, QString* error, bool download = false) {
     QNetworkAccessManager manager;
     QNetworkRequest request(url);
     request.setRawHeader("Accept", download ? "application/octet-stream" : "application/vnd.github+json");
     request.setRawHeader("User-Agent", "morfUpdate-agent");
-    request.setRawHeader("Authorization", "Bearer " + token);
+    if (!token.isEmpty()) request.setRawHeader("Authorization", "Bearer " + token);
     QNetworkReply* reply = manager.get(request);
     QEventLoop loop;
     QTimer timeout;
@@ -207,9 +193,8 @@ void UpdateEngine::run(const QString& operationId) {
     if (!operation || operation->state != UpdateState::Queued) return;
     const AgentTarget target = m_config.targets.value(operation->project);
     if (target.project.isEmpty()) { fail(operationId, QStringLiteral("project is not configured")); return; }
-    QByteArray token;
+    const QByteArray token;
     QString error;
-    if (!readSecret(m_config.githubTokenFile, &token, &error)) { fail(operationId, error); return; }
     if (!m_operations->transition(operationId, UpdateState::Downloading, QStringLiteral("reading release"), &error)) return;
     QJsonObject release;
     if (!jsonGet(QStringLiteral("repos/") + target.repository + QStringLiteral("/releases/tags/v")

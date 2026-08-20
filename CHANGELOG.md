@@ -8,6 +8,12 @@ file at the repository root).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-20
+### Changed
+- Use anonymous GitHub access for public releases and remove the local Bearer
+  token requirement. The agent remains loopback-only and retains the configured
+  target allow-list, provenance, checksum and platform checks.
+
 ## [0.3.4] - 2026-08-20
 ### Changed
 - Advance the release version so the source tag, production commit and package

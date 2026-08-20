@@ -2,7 +2,7 @@
 
 *Read in another language: **English** (this document) · [Français](README.fr.md).*
 
-[![Version](https://img.shields.io/badge/version-0.3.4-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.4.0-blue)](CHANGELOG.md)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
 ![Qt](https://img.shields.io/badge/Qt-6-41CD52?logo=qt)
 ![Build](https://img.shields.io/badge/CMake-3.21+-064F8C?logo=cmake)
@@ -102,9 +102,9 @@ In a standalone build, `morfupdate_demo` (console) and `morfupdate_widget_demo`
 
 ## Local update agent
 
-`morfupdate-agent` binds only to `127.0.0.1:8794`. A dedicated Bearer token is
-read from a protected file. The agent accepts only a configured project and
-version, records an asynchronous operation, validates the GitHub release tag,
+`morfupdate-agent` binds only to `127.0.0.1:8794`. On a trusted LAN, it accepts
+requests forwarded by the local morfMonitor without a user-managed token. The
+agent accepts only a configured project and version, records an asynchronous operation, validates the GitHub release tag,
 manifest and SHA-256 before invoking the platform installer. It never accepts a
 client-provided command, URL or path, and it refuses to update itself.
 

@@ -1,7 +1,5 @@
 {
   "http_port": 8794,
   "bind_address": "127.0.0.1",
-  "token_file": "@morfupdate-state@/api.token",
-  "github_token_file": "@morfupdate-config@/github-read.token",
   "targets": []
 }

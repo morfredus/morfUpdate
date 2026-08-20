@@ -2,19 +2,8 @@
 #include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QDir>
-#include <QFile>
-#include <QFileInfo>
-#include <QRandomGenerator>
-#include <QSaveFile>
 #include <QStandardPaths>
 #include <QTextStream>
-
-#ifdef Q_OS_WIN
-#include <windows.h>
-#include <aclapi.h>
-#include <accctrl.h>
-#include <sddl.h>
-#endif
 
 #include "morfupdate/AgentConfig.h"
 #include "morfupdate/LocalApiServer.h"
@@ -45,98 +34,6 @@ QString stateDirectory() {
 #endif
 }
 
-#ifdef Q_OS_WIN
-bool restrictWindowsToken(const QString& path, QString* error) {
-    PSID systemSid = nullptr;
-    if (!ConvertStringSidToSidW(L"S-1-5-18", &systemSid)) {
-        *error = QStringLiteral("cannot resolve the SYSTEM account SID");
-        return false;
-    }
-    EXPLICIT_ACCESSW entry{};
-    entry.grfAccessPermissions = GENERIC_READ | GENERIC_WRITE;
-    entry.grfAccessMode = SET_ACCESS;
-    entry.grfInheritance = NO_INHERITANCE;
-    entry.Trustee.TrusteeForm = TRUSTEE_IS_SID;
-    entry.Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
-    entry.Trustee.ptstrName = static_cast<LPWSTR>(systemSid);
-    PACL acl = nullptr;
-    const DWORD aclResult = SetEntriesInAclW(1, &entry, nullptr, &acl);
-    LocalFree(systemSid);
-    if (aclResult != ERROR_SUCCESS) {
-        *error = QStringLiteral("cannot create the SYSTEM-only token ACL");
-        return false;
-    }
-    const DWORD result = SetNamedSecurityInfoW(
-        const_cast<LPWSTR>(reinterpret_cast<LPCWSTR>(path.utf16())), SE_FILE_OBJECT,
-        DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
-        nullptr, nullptr, acl, nullptr);
-    LocalFree(acl);
-    if (result != ERROR_SUCCESS) {
-        *error = QStringLiteral("cannot protect the token ACL");
-        return false;
-    }
-    return true;
-}
-#endif
-
-QString configDirectory() {
-#ifdef Q_OS_WIN
-    return QDir(qEnvironmentVariable("ProgramData")).filePath(
-        QStringLiteral("morfsystem/morfupdate"));
-#else
-    return QStringLiteral("/etc/morfsystem/morfupdate");
-#endif
-}
-
-void resolveProtectedPaths(morfupdate::AgentConfig* config) {
-    config->tokenFile.replace(QStringLiteral("@morfupdate-state@"), stateDirectory());
-    config->githubTokenFile.replace(QStringLiteral("@morfupdate-config@"), configDirectory());
-}
-
-bool ensureToken(const QString& path, QString* error) {
-    QFile existing(path);
-    if (existing.exists()) {
-#ifndef Q_OS_WIN
-        const QFile::Permissions unsafe = QFileDevice::ReadGroup | QFileDevice::WriteGroup
-            | QFileDevice::ReadOther | QFileDevice::WriteOther;
-        if (existing.permissions() & unsafe) {
-            *error = QStringLiteral("token file permissions expose it beyond its service identities");
-            return false;
-        }
-#endif
-#ifdef Q_OS_WIN
-        if (!restrictWindowsToken(path, error))
-            return false;
-#endif
-        return true;
-    }
-    if (!QDir().mkpath(QFileInfo(path).dir().path())) {
-        *error = QStringLiteral("cannot create token directory");
-        return false;
-    }
-    QByteArray random;
-    for (int index = 0; index < 4; ++index) {
-        const quint64 value = QRandomGenerator::system()->generate64();
-        random.append(QByteArray::number(value, 16).rightJustified(16, '0'));
-    }
-    QSaveFile token(path);
-    if (!token.open(QIODevice::WriteOnly)) {
-        *error = token.errorString();
-        return false;
-    }
-    token.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
-    token.write(random + '\n');
-    if (!token.commit()) {
-        *error = token.errorString();
-        return false;
-    }
-#ifdef Q_OS_WIN
-    if (!restrictWindowsToken(path, error))
-        return false;
-#endif
-    return true;
-}
-
 void errorLine(const QString& value) {
     QTextStream stream(stderr);
     stream << value << '\n';
@@ -164,11 +61,6 @@ int main(int argc, char** argv) {
     if (!morfupdate::AgentConfig::load(configPath, &config, &error)) {
         errorLine(QStringLiteral("morfUpdate configuration refused: ") + error);
         return 2;
-    }
-    resolveProtectedPaths(&config);
-    if (!ensureToken(config.tokenFile, &error)) {
-        errorLine(QStringLiteral("morfUpdate token refused: ") + error);
-        return 3;
     }
     morfupdate::OperationStore operations(stateDirectory());
     if (!operations.load(&error)) {
