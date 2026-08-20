@@ -8,6 +8,30 @@ file at the repository root).
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-08-20
+### Security
+- Store the Windows local API token under ProgramData with a SYSTEM-only ACL shared by the service tasks.
+
+## [0.3.2] - 2026-08-20
+### Fixed
+- Let a newly installed agent start safely before any update target or GitHub token is configured.
+
+## [0.3.1] - 2026-08-20
+### Security
+- Separated the Linux privileged package helper from the loopback HTTP agent.
+
+## [0.3.0] - 2026-08-20
+### Added
+- Added the loopback-only morfUpdate agent and its authenticated asynchronous API.
+- Added GitHub release, manifest, tag-commit and SHA-256 verification before installation.
+- Added Linux Debian and Windows ZIP installation backends for declared targets.
+- Added service packaging metadata for Linux AMD64, Linux ARM64 and Windows x86_64.
+
+## [0.2.0] - 2026-08-20
+### Added
+- Added the persistent update-operation core used by the local update agent.
+- Added strict operation states and a single-active-operation guard.
+
 ## [0.1.1] - 2026-07-22
 ### Changed
 - Updated integration documentation to use canonical production project paths.

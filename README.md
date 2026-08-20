@@ -2,14 +2,14 @@
 
 *Read in another language: **English** (this document) · [Français](README.fr.md).*
 
-[![Version](https://img.shields.io/badge/version-0.1.1-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.3-blue)](CHANGELOG.md)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
 ![Qt](https://img.shields.io/badge/Qt-6-41CD52?logo=qt)
 ![Build](https://img.shields.io/badge/CMake-3.21+-064F8C?logo=cmake)
 ![License](https://img.shields.io/badge/License-GPL--3.0--only-blue)
 
-**Shared C++ library for update checking in desktop applications** (ComponentHub,
-SiteWatch, and future tools).
+**Shared C++ update-checking library and local verified update agent** for
+morfSystem applications.
 
 It compares the installed version against the latest published version and
 **notifies** the user - without ever installing anything silently.
@@ -100,12 +100,21 @@ In a standalone build, `morfupdate_demo` (console) and `morfupdate_widget_demo`
 ./build-mingw/examples/widget/morfupdate_widget_demo
 ```
 
-## Design choice: no auto-update
+## Local update agent
 
-The dialog **opens the release page / the binary in the browser**; downloading
-and installing stay in the user's hands. An automatic installer only makes sense
-with **signature verification**; the door is left open (assets are exposed in
-`ReleaseInfo`) to add it properly later.
+`morfupdate-agent` binds only to `127.0.0.1:8794`. A dedicated Bearer token is
+read from a protected file. The agent accepts only a configured project and
+version, records an asynchronous operation, validates the GitHub release tag,
+manifest and SHA-256 before invoking the platform installer. It never accepts a
+client-provided command, URL or path, and it refuses to update itself.
+
+Its contract and the required platform configuration are documented in
+[docs/fr/AGENT-CONTRACT.md](docs/fr/AGENT-CONTRACT.md).
+
+## Desktop behaviour
+
+The desktop dialog opens the release page. Installation stays delegated to the
+local agent, which performs explicit verification before it can act.
 
 ## Documentation
 

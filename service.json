@@ -1,0 +1,26 @@
+{
+  "service_name": "morfupdate",
+  "display_name": "morfUpdate",
+  "description": "Local verified package update agent for morfSystem",
+  "binary": "morfupdate",
+  "helper_binary": "morfupdate-helper",
+  "app_dir": {
+    "linux": "/opt/morfupdate",
+    "windows": "%ProgramData%/morfupdate"
+  },
+  "config_dir": {
+    "linux": "/etc/morfsystem/morfupdate",
+    "windows": "%ProgramData%/morfsystem/morfupdate"
+  },
+  "state_dir": {
+    "linux": "/var/lib/morfsystem/morfupdate",
+    "windows": "%ProgramData%/morfsystem/morfupdate/state"
+  },
+  "configs": [
+    {
+      "source": "config/morfupdate.example.json",
+      "dest": "morfupdate.json"
+    }
+  ],
+  "status_url": "http://127.0.0.1:8794/healthz"
+}

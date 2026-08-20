@@ -21,12 +21,24 @@ add_library(morfUpdate STATIC
     src/Version.cpp
     src/GitHubReleaseSource.cpp
     src/UpdateChecker.cpp
+    src/UpdateOperation.cpp
+    src/OperationStore.cpp
+    src/AgentConfig.cpp
+    src/LocalApiServer.cpp
+    src/ReleaseValidator.cpp
+    src/UpdateEngine.cpp
     include/morfupdate/Version.h
     include/morfupdate/ReleaseInfo.h
     include/morfupdate/morfUpdateConfig.h
     include/morfupdate/IUpdateSource.h
     include/morfupdate/GitHubReleaseSource.h
     include/morfupdate/UpdateChecker.h
+    include/morfupdate/UpdateOperation.h
+    include/morfupdate/OperationStore.h
+    include/morfupdate/AgentConfig.h
+    include/morfupdate/LocalApiServer.h
+    include/morfupdate/ReleaseValidator.h
+    include/morfupdate/UpdateEngine.h
 )
 add_library(morfUpdate::morfUpdate ALIAS morfUpdate)
 
@@ -70,4 +82,9 @@ if(MORFUPDATE_BUILD_EXAMPLES)
     if(MORFUPDATE_BUILD_WIDGETS)
         add_subdirectory(examples/widget)
     endif()
+endif()
+
+option(MORFUPDATE_BUILD_AGENT "Compiler l'agent local de mise à jour" ON)
+if(MORFUPDATE_BUILD_AGENT)
+    add_subdirectory(agent)
 endif()

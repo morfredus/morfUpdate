@@ -1,0 +1,19 @@
+[Unit]
+Description=morfUpdate - local verified update agent
+After=local-fs.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__RUN_USER__
+Group=__RUN_USER__
+WorkingDirectory=__APP_DIR__
+StateDirectory=morfsystem/morfupdate
+ExecStart=__APP_DIR__/morfupdate --config __CONFIG_DIR__/morfupdate.json
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

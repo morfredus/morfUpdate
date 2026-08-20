@@ -2,14 +2,14 @@
 
 *Lire dans une autre langue : [English](README.md) · **Français** (ce document).*
 
-[![Version](https://img.shields.io/badge/version-0.1.1-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.3-blue)](CHANGELOG.md)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
 ![Qt](https://img.shields.io/badge/Qt-6-41CD52?logo=qt)
 ![Build](https://img.shields.io/badge/CMake-3.21+-064F8C?logo=cmake)
 ![Licence](https://img.shields.io/badge/Licence-GPL--3.0--only-blue)
 
-**Bibliothèque C++ commune de détection de mises à jour pour les applications de
-bureau** (ComponentHub, SiteWatch, et les outils à venir).
+**Bibliothèque C++ commune de détection des mises à jour et agent local de mise
+à jour vérifiée** pour les applications morfSystem.
 
 Elle compare la version installée à la dernière version publiée et **notifie**
 l'utilisateur, sans jamais installer quoi que ce soit en silence.
