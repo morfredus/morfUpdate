@@ -8,6 +8,11 @@ file at the repository root).
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-08-20
+### Changed
+- Advance the release version so the source tag, production commit and package
+  provenance are created from the same revision.
+
 ## [0.3.3] - 2026-08-20
 ### Security
 - Store the Windows local API token under ProgramData with a SYSTEM-only ACL shared by the service tasks.
