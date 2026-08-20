@@ -8,6 +8,11 @@ file at the repository root).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-20
+### Fixed
+- Install the Linux privileged helper during a source-based deployment too, so
+  the first verified update does not fail after a successful agent startup.
+
 ## [0.4.0] - 2026-08-20
 ### Changed
 - Use anonymous GitHub access for public releases and remove the local Bearer
