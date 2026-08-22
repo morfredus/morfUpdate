@@ -48,6 +48,12 @@ int refuse(const QString& message) {
 } // namespace
 
 int main(int argc, char** argv) {
+    // Ce binaire est setuid (4750) : lance par le service non privilegie, son euid
+    // passe a root. Qt refuse par defaut de tourner setuid (« running setuid, this
+    // is a security hole ») et avorte. On l'autorise explicitement, AVANT de
+    // construire QCoreApplication : c'est le mecanisme voulu, borne par les
+    // controles ci-dessous (root requis, verbe unique, service declare).
+    QCoreApplication::setSetuidAllowed(true);
     QCoreApplication app(argc, argv);
 #ifndef Q_OS_UNIX
     return refuse(QStringLiteral("the privileged helper is only used on Linux"));

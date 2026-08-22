@@ -8,6 +8,19 @@ file at the repository root).
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-08-22
+
+### Changed
+
+- Default `targets` now lists every parc service except morfUpdate itself. An existing install that still has a single test target is not enlarged by `service.py update`; use `config push --force`.
+
+## [0.4.2] - 2026-08-21
+
+### Corrigé
+
+- Helper privilégié : autoriser explicitement l'exécution setuid de Qt (QCoreApplication::setSetuidAllowed) ; sans cela le helper avortait « running setuid, this is a security hole » quand le service non privilégié l'invoquait.
+- Copie vendorée de morfdeploy alignée sur 0.17.4 (dossier du helper traversable par le compte de service).
+
 ## [0.4.1] - 2026-08-20
 ### Fixed
 - Install the Linux privileged helper during a source-based deployment too, so

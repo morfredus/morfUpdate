@@ -26,11 +26,14 @@ jumelage ou mTLS, jamais la réutilisation d'un bearer token sur le LAN.
 
 ## Configuration initiale
 
-Le paquet démarre avec une liste `targets` vide : il répond à `/healthz` mais
-refuse toute installation. Ajouter ensuite, dans la configuration administrée,
-le fichier de jeton GitHub en lecture seule et chaque cible autorisée. Une cible
-déclare son projet, son unité, son dépôt, son URL `/healthz` et, sous Windows,
-son répertoire applicatif ainsi que `service_manager` (`scm` ou `task`).
+Le paquet démarre avec une liste `targets` qui autorise **tous les services
+du parc** (sauf `morfUpdate`, qui refuse de se mettre à jour lui-même).
+Chaque cible déclare son projet GitHub, son unité, son dépôt, son URL
+`/healthz` et, sous Windows, `app_dir` plus `service_manager`.
+
+`service.py update` n'ajoute **jamais** d'entrée dans une liste déjà
+présente. Une machine qui n'avait qu'une cible de test (souvent
+`morfCollector`) garde cette liste jusqu'à un `config push --force`.
 
 Sous Windows, le jeton est placé sous
 `%ProgramData%/morfsystem/morfupdate/state/` et son ACL est limitée à `SYSTEM`.

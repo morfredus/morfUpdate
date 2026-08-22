@@ -1,5 +1,71 @@
 {
   "http_port": 8794,
   "bind_address": "127.0.0.1",
-  "targets": []
+  "_comment": "project = identifiant GitHub (celui que PhotoHub/morfMonitor envoient). service = unite systemd. repository = owner/repo. health_url = GET /healthz en boucle locale. morfUpdate n'est PAS une cible : l'agent refuse de se mettre a jour lui-meme. service.py update n'ajoute JAMAIS d'entree dans une liste deja presente : sur une install qui n'avait qu'un service de test, aligner avec : sudo python3 service.py config push --force (depuis le clone), puis systemctl restart morfupdate.",
+  "targets": [
+    {
+      "project": "morfAnalytics",
+      "service": "morfanalytics",
+      "repository": "morfredus/morfAnalytics",
+      "health_url": "http://127.0.0.1:8799/healthz",
+      "app_dir": "%ProgramData%/morfanalytics",
+      "service_manager": "task"
+    },
+    {
+      "project": "morfCollector",
+      "service": "morfcollector",
+      "repository": "morfredus/morfCollector",
+      "health_url": "http://127.0.0.1:8792/healthz",
+      "app_dir": "%ProgramData%/morfcollector",
+      "service_manager": "task"
+    },
+    {
+      "project": "morfDashboard",
+      "service": "morfdashboard",
+      "repository": "morfredus/morfDashboard",
+      "health_url": "http://127.0.0.1:8791/healthz",
+      "app_dir": "%ProgramData%/morfdashboard",
+      "service_manager": "task"
+    },
+    {
+      "project": "morfMonitor",
+      "service": "morfmonitor",
+      "repository": "morfredus/morfMonitor",
+      "health_url": "http://127.0.0.1:8790/healthz",
+      "app_dir": "%ProgramData%/morfmonitor",
+      "service_manager": "task"
+    },
+    {
+      "project": "morfNotify",
+      "service": "morfnotify",
+      "repository": "morfredus/morfNotify",
+      "health_url": "http://127.0.0.1:8789/healthz",
+      "app_dir": "%ProgramData%/morfnotify",
+      "service_manager": "task"
+    },
+    {
+      "project": "morfPhoto",
+      "service": "morfphoto",
+      "repository": "morfredus/morfPhoto",
+      "health_url": "http://127.0.0.1:8793/healthz",
+      "app_dir": "%ProgramData%/morfphoto",
+      "service_manager": "task"
+    },
+    {
+      "project": "morfSensor",
+      "service": "morfsensor",
+      "repository": "morfredus/morfSensor",
+      "health_url": "http://127.0.0.1:8788/healthz",
+      "app_dir": "%ProgramData%/morfsensor",
+      "service_manager": "task"
+    },
+    {
+      "project": "morfSync",
+      "service": "morfsync",
+      "repository": "morfredus/morfSync",
+      "health_url": "http://127.0.0.1:8080/healthz",
+      "app_dir": "%ProgramData%/morfsync",
+      "service_manager": "task"
+    }
+  ]
 }
