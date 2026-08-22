@@ -11,6 +11,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QRegularExpression>
 #include <QTextStream>
 
@@ -33,16 +34,31 @@ bool declaredService(const QString& service) {
     return false;
 }
 
-bool run(const QString& program, const QStringList& arguments) {
-    QProcess process;
-    process.start(program, arguments);
-    return process.waitForStarted(10000) && process.waitForFinished(-1)
-        && process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
-}
-
 int refuse(const QString& message) {
     QTextStream(stderr) << "morfUpdate helper refused: " << message << '\n';
     return 2;
+}
+
+bool run(const QString& program, const QStringList& arguments, QString* detail) {
+    QProcess process;
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    // Sans ça, dpkg peut attendre une question sur un conffile et échouer.
+    env.insert(QStringLiteral("DEBIAN_FRONTEND"), QStringLiteral("noninteractive"));
+    process.setProcessEnvironment(env);
+    process.start(program, arguments);
+    if (!process.waitForStarted(10000) || !process.waitForFinished(-1)
+        || process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+        const QString err = QString::fromUtf8(process.readAllStandardError()).trimmed();
+        if (detail) {
+            *detail = err.isEmpty()
+                          ? QStringLiteral("%1 failed (code %2)")
+                                .arg(program)
+                                .arg(process.exitCode())
+                          : err;
+        }
+        return false;
+    }
+    return true;
 }
 
 } // namespace
@@ -70,11 +86,22 @@ int main(int argc, char** argv) {
         || !declaredService(service)) {
         return refuse(QStringLiteral("artifact or declared service is invalid"));
     }
-    if (!run(QStringLiteral("dpkg"), {QStringLiteral("--install"), artifact}))
-        return refuse(QStringLiteral("dpkg failed"));
-    if (!run(QStringLiteral("systemctl"), {QStringLiteral("restart"), service})
-        || !run(QStringLiteral("systemctl"), {QStringLiteral("is-active"), QStringLiteral("--quiet"), service})) {
-        return refuse(QStringLiteral("service did not restart"));
+    // dpkg et systemctl testent getuid() (UID réel), pas l'euid. Tant que le
+    // helper n'a que l'euid root, dpkg sort tout de suite (« superuser privilege »)
+    // alors que le même .deb s'installe avec sudo. Même classe d'erreur que
+    // mount.cifs. On devient root réel après les contrôles ci-dessus.
+    if (setgid(0) != 0 || setuid(0) != 0)
+        return refuse(QStringLiteral("cannot assume real root"));
+    QString detail;
+    if (!run(QStringLiteral("/usr/bin/dpkg"),
+             {QStringLiteral("--install"), artifact}, &detail))
+        return refuse(QStringLiteral("dpkg failed: ") + detail);
+    if (!run(QStringLiteral("/usr/bin/systemctl"),
+             {QStringLiteral("restart"), service}, &detail)
+        || !run(QStringLiteral("/usr/bin/systemctl"),
+                {QStringLiteral("is-active"), QStringLiteral("--quiet"), service},
+                &detail)) {
+        return refuse(QStringLiteral("service did not restart: ") + detail);
     }
     return 0;
 #endif

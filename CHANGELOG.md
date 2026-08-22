@@ -8,6 +8,15 @@ file at the repository root).
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-08-22
+
+### Corrigé
+
+- Helper setuid : `dpkg` et `systemctl` testent l'UID *réel*. Sans `setuid(0)` /
+  `setgid(0)` après les contrôles, `dpkg --install` échoue tout de suite alors que
+  le même `.deb` s'installe avec `sudo`. Chemins absolus, `DEBIAN_FRONTEND=noninteractive`,
+  stderr de dpkg remonté dans le refus.
+
 ## [0.4.3] - 2026-08-22
 
 ### Changed
