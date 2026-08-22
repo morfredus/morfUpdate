@@ -127,7 +127,11 @@ données HTTP, ni URL, ni commande.
 | Service | systemd | Service Control Manager, ou tâche système historique |
 | Installation | `dpkg` avec dépendances résolues | extraction contrôlée et remplacement applicatif |
 | Configuration et données | conservées hors du paquet | conservées hors du ZIP |
-| Contrôle final | unité active et `/healthz` | SCM actif et `/healthz` |
+| Contrôle final | unité active et `/healthz` (retries) | SCM actif et `/healthz` (retries) |
+
+Après installation, `/healthz` est interrogé plusieurs fois (environ une minute).
+Si le paquet est déjà posé et le service relancé, un `/healthz` encore muet ne
+fait pas échouer l'opération : la version demandée est considérée installée.
 
 L'exécuteur ne réenregistre un service que si le contrat du paquet le requiert.
 Il n'exécute jamais aveuglément un script contenu dans une archive.

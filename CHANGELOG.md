@@ -8,6 +8,15 @@ file at the repository root).
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-08-23
+
+### Corrigé
+
+- Après `dpkg`, le contrôle `/healthz` est retenté une minute (20 × 3 s). S'il
+  échoue encore, l'opération reste un succès (paquet déjà posé) au lieu d'une
+  fenêtre d'échec alors que le service tourne. Le refus du helper inclut
+  `QProcess::errorString` quand stderr est vide.
+
 ## [0.4.4] - 2026-08-22
 
 ### Corrigé
