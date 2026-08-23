@@ -96,13 +96,28 @@ int main(int argc, char** argv) {
     if (!run(QStringLiteral("/usr/bin/dpkg"),
              {QStringLiteral("--install"), artifact}, &detail))
         return refuse(QStringLiteral("dpkg failed: ") + detail);
-    if (!run(QStringLiteral("/usr/bin/systemctl"),
-             {QStringLiteral("restart"), service}, &detail)
-        || !run(QStringLiteral("/usr/bin/systemctl"),
-                {QStringLiteral("is-active"), QStringLiteral("--quiet"), service},
-                &detail)) {
-        return refuse(QStringLiteral("service did not restart: ") + detail);
+    // L'ancien prerm faisait disable --now a chaque upgrade. Si le postinst
+    // avale un echec d'enable (--now || true), le service reste eteint : cas vu
+    // en mettant a jour morfMonitor depuis sa propre page (Failed to fetch).
+    QString ignored;
+    run(QStringLiteral("/usr/bin/systemctl"), {QStringLiteral("daemon-reload")}, &ignored);
+    run(QStringLiteral("/usr/bin/systemctl"),
+        {QStringLiteral("reset-failed"), service}, &ignored);
+    run(QStringLiteral("/usr/bin/systemctl"),
+        {QStringLiteral("enable"), service}, &ignored);
+    bool active = false;
+    for (int attempt = 0; attempt < 4 && !active; ++attempt) {
+        if (attempt > 0)
+            sleep(2);
+        if (!run(QStringLiteral("/usr/bin/systemctl"),
+                 {QStringLiteral("restart"), service}, &detail))
+            continue;
+        active = run(QStringLiteral("/usr/bin/systemctl"),
+                     {QStringLiteral("is-active"), QStringLiteral("--quiet"), service},
+                     &detail);
     }
+    if (!active)
+        return refuse(QStringLiteral("service did not restart: ") + detail);
     return 0;
 #endif
 }

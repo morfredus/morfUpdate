@@ -8,6 +8,14 @@ file at the repository root).
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-08-23
+
+### Corrigé
+
+- Helper après `dpkg` : `daemon-reload`, `reset-failed`, `enable`, puis
+  `restart` retenté. Un ancien `prerm` `disable --now` ne laisse plus le service
+  éteint (mise à jour de morfMonitor depuis lui-même).
+
 ## [0.4.5] - 2026-08-23
 
 ### Corrigé
