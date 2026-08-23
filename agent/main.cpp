@@ -45,6 +45,7 @@ void errorLine(const QString& value) {
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
     QCoreApplication::setApplicationName(QStringLiteral("morfUpdate"));
+    QCoreApplication::setApplicationVersion(QStringLiteral(MORFUPDATE_VERSION));
 
     QCommandLineParser parser;
     parser.addHelpOption();

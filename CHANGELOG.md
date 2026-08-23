@@ -8,6 +8,13 @@ file at the repository root).
 
 ## [Unreleased]
 
+## [0.4.7] - 2026-08-23
+
+### Ajouté
+
+- `GET /status` expose `version` (contrat HTTP). morfMonitor peut afficher la
+  version exécutée sans heartbeat beacon.
+
 ## [0.4.6] - 2026-08-23
 
 ### Corrigé
