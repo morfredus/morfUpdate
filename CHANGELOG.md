@@ -8,6 +8,25 @@ file at the repository root).
 
 ## [Unreleased]
 
+## [0.4.8] - 2026-08-25
+
+### Ajouté
+
+- **Stratégie d'installation `source-bundle` (projets non compilés, ex.
+  morfDashboard).** Le moteur lit `install.type` du manifeste (défaut `package`,
+  rétro-compat) au lieu de présumer un binaire : `package` = flux .deb/.zip
+  inchangé ; `source-bundle` = archive `.tar.gz` des fichiers applicatifs.
+  L'archive est vérifiée (checksum + provenance + VERSION embarquée) puis
+  **extraite hors privilège** par l'agent ; l'installation elle-même est un
+  **échange atomique** délégué au helper setuid.
+- **Helper : verbe `--install-bundle <unpackdir> <service>`.** Échange le
+  répertoire applicatif sous `/opt/<service>` (convention, jamais un chemin reçu
+  de l'appelant), après sauvegarde `.morfupdate.bak` : arrêt du service, copie de
+  l'arborescence extraite, propriétaire repris de l'ancienne install, (re)démarrage
+  avec tentatives, et **rollback** (restauration + redémarrage) si le service ne
+  revient pas actif. Config, état (`/etc`, `/var/lib`) jamais touchés. Le chemin
+  `--install-deb` est inchangé (restart factorisé avec le bundle).
+
 ## [0.4.7] - 2026-08-23
 
 ### Ajouté

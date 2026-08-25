@@ -61,6 +61,76 @@ bool run(const QString& program, const QStringList& arguments, QString* detail) 
     return true;
 }
 
+#ifdef Q_OS_UNIX
+// Recharge systemd et (re)démarre le service, avec quelques tentatives : un
+// /healthz lent ou un enable qui a avalé une erreur ne doit pas figer le service
+// éteint. Renvoie vrai quand l'unité est active. Factorisé : deb et bundle en ont
+// besoin à l'identique.
+bool bringUp(const QString& service, QString* detail) {
+    QString ignored;
+    run(QStringLiteral("/usr/bin/systemctl"), {QStringLiteral("daemon-reload")}, &ignored);
+    run(QStringLiteral("/usr/bin/systemctl"), {QStringLiteral("reset-failed"), service}, &ignored);
+    run(QStringLiteral("/usr/bin/systemctl"), {QStringLiteral("enable"), service}, &ignored);
+    bool active = false;
+    for (int attempt = 0; attempt < 4 && !active; ++attempt) {
+        if (attempt > 0) sleep(2);
+        if (!run(QStringLiteral("/usr/bin/systemctl"), {QStringLiteral("restart"), service}, detail))
+            continue;
+        active = run(QStringLiteral("/usr/bin/systemctl"),
+                     {QStringLiteral("is-active"), QStringLiteral("--quiet"), service}, detail);
+    }
+    return active;
+}
+
+// Installe un source-bundle DEJA EXTRAIT : échange atomique du répertoire
+// applicatif sous /opt, avec sauvegarde pour rollback. Le helper ne touche
+// jamais à l'archive elle-même (extraite non privilégiée par l'agent) ; il ne
+// fait que des déplacements de répertoires et un redémarrage, tous auditables.
+// Le répertoire cible est une CONVENTION (/opt/<service>), jamais un chemin reçu
+// de l'appelant : rien d'arbitraire ne peut être écrasé.
+int installBundle(const QString& unpack, const QString& service) {
+    const QString appDir = QStringLiteral("/opt/") + service;
+    const QString backup = appDir + QStringLiteral(".morfupdate.bak");
+    QString detail, ignored;
+
+    // Le service peut tenir des fichiers ouverts : on l'arrête avant l'échange.
+    run(QStringLiteral("/usr/bin/systemctl"), {QStringLiteral("stop"), service}, &ignored);
+
+    run(QStringLiteral("/usr/bin/rm"), {QStringLiteral("-rf"), backup}, &ignored);
+    const bool hadPrevious = QFileInfo::exists(appDir);
+    if (hadPrevious && !run(QStringLiteral("/usr/bin/mv"), {appDir, backup}, &detail)) {
+        bringUp(service, &ignored);   // ne pas laisser le service à terre
+        return refuse(QStringLiteral("cannot set aside current install: ") + detail);
+    }
+    // cp -aT : copie le CONTENU de unpack dans appDir (crée appDir), en
+    // préservant les modes. On ne déplace pas unpack (il vit dans downloads/,
+    // nettoyé par ailleurs) pour garder la sauvegarde intacte en cas d'échec.
+    if (!run(QStringLiteral("/usr/bin/cp"),
+             {QStringLiteral("-aT"), unpack, appDir}, &detail)) {
+        run(QStringLiteral("/usr/bin/rm"), {QStringLiteral("-rf"), appDir}, &ignored);
+        if (hadPrevious) run(QStringLiteral("/usr/bin/mv"), {backup, appDir}, &ignored);
+        bringUp(service, &ignored);
+        return refuse(QStringLiteral("cannot deploy source bundle: ") + detail);
+    }
+    // Conserver le propriétaire établi (l'utilisateur du service), repris de la
+    // sauvegarde : le service lit son code sous cette identité.
+    if (hadPrevious) {
+        run(QStringLiteral("/usr/bin/chown"),
+            {QStringLiteral("-R"), QStringLiteral("--reference=") + backup, appDir}, &ignored);
+    }
+
+    if (!bringUp(service, &detail)) {
+        // Rollback : restaurer l'ancienne arborescence et relancer.
+        run(QStringLiteral("/usr/bin/rm"), {QStringLiteral("-rf"), appDir}, &ignored);
+        if (hadPrevious) run(QStringLiteral("/usr/bin/mv"), {backup, appDir}, &ignored);
+        bringUp(service, &ignored);
+        return refuse(QStringLiteral("service did not restart; rolled back: ") + detail);
+    }
+    run(QStringLiteral("/usr/bin/rm"), {QStringLiteral("-rf"), backup}, &ignored);
+    return 0;
+}
+#endif  // Q_OS_UNIX
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -76,22 +146,48 @@ int main(int argc, char** argv) {
 #else
     if (geteuid() != 0) return refuse(QStringLiteral("root execution is required"));
     const QStringList arguments = app.arguments();
-    if (arguments.size() != 4 || arguments.at(1) != QStringLiteral("--install-deb"))
-        return refuse(QStringLiteral("only --install-deb <artifact> <service> is accepted"));
-    const QString artifact = QFileInfo(arguments.at(2)).canonicalFilePath();
-    const QString service = arguments.at(3);
     static const QRegularExpression unit(QStringLiteral("^[a-z][a-z0-9-]{1,63}$"));
-    if (artifact.isEmpty() || !artifact.startsWith(QString::fromLatin1(kDownloads))
-        || !artifact.endsWith(QStringLiteral(".deb")) || !unit.match(service).hasMatch()
-        || !declaredService(service)) {
-        return refuse(QStringLiteral("artifact or declared service is invalid"));
+    // Deux verbes, même forme : <verbe> <source> <service>.
+    //   --install-deb    <artifact.deb>  <service>  (projet compilé)
+    //   --install-bundle <unpack-dir>    <service>  (projet source-bundle)
+    if (arguments.size() != 4
+        || (arguments.at(1) != QStringLiteral("--install-deb")
+            && arguments.at(1) != QStringLiteral("--install-bundle"))) {
+        return refuse(QStringLiteral(
+            "usage: --install-deb <artifact> <service> | --install-bundle <unpackdir> <service>"));
     }
+    const QString verb = arguments.at(1);
+    const QString service = arguments.at(3);
+    if (!unit.match(service).hasMatch() || !declaredService(service))
+        return refuse(QStringLiteral("declared service is invalid"));
+
+    // Validation de la source AVANT de devenir root. Dans les deux cas la source
+    // doit vivre sous le répertoire de téléchargements protégé de l'agent.
+    QString artifact;
+    QString unpack;
+    if (verb == QStringLiteral("--install-deb")) {
+        artifact = QFileInfo(arguments.at(2)).canonicalFilePath();
+        if (artifact.isEmpty() || !artifact.startsWith(QString::fromLatin1(kDownloads))
+            || !artifact.endsWith(QStringLiteral(".deb")))
+            return refuse(QStringLiteral("artifact is invalid"));
+    } else {
+        unpack = QFileInfo(arguments.at(2)).canonicalFilePath();
+        if (unpack.isEmpty() || !unpack.startsWith(QString::fromLatin1(kDownloads))
+            || !QFileInfo::exists(unpack + QStringLiteral("/VERSION")))
+            return refuse(QStringLiteral("unpack directory is invalid"));
+    }
+
     // dpkg et systemctl testent getuid() (UID réel), pas l'euid. Tant que le
     // helper n'a que l'euid root, dpkg sort tout de suite (« superuser privilege »)
     // alors que le même .deb s'installe avec sudo. Même classe d'erreur que
     // mount.cifs. On devient root réel après les contrôles ci-dessus.
     if (setgid(0) != 0 || setuid(0) != 0)
         return refuse(QStringLiteral("cannot assume real root"));
+
+    if (verb == QStringLiteral("--install-bundle"))
+        return installBundle(unpack, service);
+
+    // --- install-deb : installation du paquet puis (re)démarrage ---
     QString detail;
     if (!run(QStringLiteral("/usr/bin/dpkg"),
              {QStringLiteral("--install"), artifact}, &detail))
@@ -99,24 +195,7 @@ int main(int argc, char** argv) {
     // L'ancien prerm faisait disable --now a chaque upgrade. Si le postinst
     // avale un echec d'enable (--now || true), le service reste eteint : cas vu
     // en mettant a jour morfMonitor depuis sa propre page (Failed to fetch).
-    QString ignored;
-    run(QStringLiteral("/usr/bin/systemctl"), {QStringLiteral("daemon-reload")}, &ignored);
-    run(QStringLiteral("/usr/bin/systemctl"),
-        {QStringLiteral("reset-failed"), service}, &ignored);
-    run(QStringLiteral("/usr/bin/systemctl"),
-        {QStringLiteral("enable"), service}, &ignored);
-    bool active = false;
-    for (int attempt = 0; attempt < 4 && !active; ++attempt) {
-        if (attempt > 0)
-            sleep(2);
-        if (!run(QStringLiteral("/usr/bin/systemctl"),
-                 {QStringLiteral("restart"), service}, &detail))
-            continue;
-        active = run(QStringLiteral("/usr/bin/systemctl"),
-                     {QStringLiteral("is-active"), QStringLiteral("--quiet"), service},
-                     &detail);
-    }
-    if (!active)
+    if (!bringUp(service, &detail))
         return refuse(QStringLiteral("service did not restart: ") + detail);
     return 0;
 #endif
