@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project follows [Semantic Versioning](https://semver.org/) (the `VERSION`
 file at the repository root).
 
+## [0.4.9] - 2026-09-03
+
+### Changed
+
+- Re-vendored morfDeploy 0.20.5 (opt-in arm64 cross-packaging and the sysroot
+  `.shlibs` Depends resolution). The VERSION is bumped so the source tag matches
+  the rebuilt artifact after this vendored-tooling update; without it the release
+  provenance check rejects a package built past the previous tag.
+
 ## [Unreleased]
 
 ## [0.4.8] - 2026-08-25
