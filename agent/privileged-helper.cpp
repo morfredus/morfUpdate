@@ -82,6 +82,23 @@ bool bringUp(const QString& service, QString* detail) {
     return active;
 }
 
+// Relance un service DEJA installe, sans rien reinstaller : efface un eventuel
+// etat « failed », redemarre, puis confirme l'activite. C'est l'action du bouton
+// « Relancer » de morfMonitor pour un service detecte bloque. On NE reutilise pas
+// bringUp (qui fait daemon-reload + enable, utiles apres une install) : un restart
+// est un restart. Le service a deja ete valide (regex + declaredService) et n'est
+// jamais un chemin ni une commande arbitraire -- seulement un nom de service declare.
+int restartService(const QString& service) {
+    QString detail, ignored;
+    run(QStringLiteral("/usr/bin/systemctl"), {QStringLiteral("reset-failed"), service}, &ignored);
+    if (!run(QStringLiteral("/usr/bin/systemctl"), {QStringLiteral("restart"), service}, &detail))
+        return refuse(QStringLiteral("service did not restart: ") + detail);
+    if (!run(QStringLiteral("/usr/bin/systemctl"),
+             {QStringLiteral("is-active"), QStringLiteral("--quiet"), service}, &detail))
+        return refuse(QStringLiteral("service is not active after restart: ") + detail);
+    return 0;
+}
+
 // Installe un source-bundle DEJA EXTRAIT : échange atomique du répertoire
 // applicatif sous /opt, avec sauvegarde pour rollback. Le helper ne touche
 // jamais à l'archive elle-même (extraite non privilégiée par l'agent) ; il ne
@@ -147,6 +164,22 @@ int main(int argc, char** argv) {
     if (geteuid() != 0) return refuse(QStringLiteral("root execution is required"));
     const QStringList arguments = app.arguments();
     static const QRegularExpression unit(QStringLiteral("^[a-z][a-z0-9-]{1,63}$"));
+
+    // Verbe --restart : forme COURTE <verbe> <service>, sans source ni fichier.
+    // Périmètre volontairement minuscule : relancer un service DÉJÀ déclaré, rien
+    // d'autre. Mêmes barrières que l'install (regex d'unité + declaredService),
+    // passage à root SEULEMENT après validation. Jamais de commande arbitraire.
+    if (arguments.value(1) == QStringLiteral("--restart")) {
+        if (arguments.size() != 3)
+            return refuse(QStringLiteral("usage: --restart <service>"));
+        const QString service = arguments.at(2);
+        if (!unit.match(service).hasMatch() || !declaredService(service))
+            return refuse(QStringLiteral("declared service is invalid"));
+        if (setgid(0) != 0 || setuid(0) != 0)
+            return refuse(QStringLiteral("cannot assume real root"));
+        return restartService(service);
+    }
+
     // Deux verbes, même forme : <verbe> <source> <service>.
     //   --install-deb    <artifact.deb>  <service>  (projet compilé)
     //   --install-bundle <unpack-dir>    <service>  (projet source-bundle)

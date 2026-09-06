@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project follows [Semantic Versioning](https://semver.org/) (the `VERSION`
 file at the repository root).
 
+## [0.5.0] - 2026-09-06
+
+### Added
+
+- **Manual service restart (loopback only).** A new `--restart <service>` verb in
+  the privileged helper and a `POST /api/v1/restart {project}` route on the
+  loopback API let a local caller (morfMonitor) request the restart of a stuck
+  service. Deliberately narrow: the helper reuses the declared-target whitelist
+  (`declaredService`), validates the unit and becomes root **only** after
+  validation, then runs `reset-failed` + `restart` + `is-active` - never an
+  arbitrary command, never a client-supplied path. The action reuses the
+  operation journal (audit + single-active lock) and drives the existing
+  `Restarting → HealthCheck → Succeeded/Failed` states (`Queued → Restarting`
+  added to the state machine). The real systemd unit is resolved server-side from
+  the declared target, never received from the client. Status is followed through
+  the shared `GET /api/v1/updates/<id>` route. Linux first; the Windows branch
+  fails cleanly and is left for the cross-host work.
+
 ## [0.4.9] - 2026-09-03
 
 ### Changed

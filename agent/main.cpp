@@ -76,6 +76,8 @@ int main(int argc, char** argv) {
     morfupdate::UpdateEngine engine(config, &operations, stateDirectory());
     QObject::connect(&api, &morfupdate::LocalApiServer::operationQueued,
                      &engine, &morfupdate::UpdateEngine::run, Qt::QueuedConnection);
+    QObject::connect(&api, &morfupdate::LocalApiServer::restartQueued,
+                     &engine, &morfupdate::UpdateEngine::restart, Qt::QueuedConnection);
     QTextStream(stdout) << "morfUpdate agent listening on 127.0.0.1:" << api.port() << '\n';
     return app.exec();
 }
