@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QStandardPaths>
 #include <QTextStream>
+#include <QThread>
 
 #include "morfupdate/AgentConfig.h"
 #include "morfupdate/LocalApiServer.h"
@@ -73,11 +74,27 @@ int main(int argc, char** argv) {
         errorLine(QStringLiteral("morfUpdate API refused: ") + error);
         return 5;
     }
+    // L'installation (dpkg, attente du redemarrage, sondes de sante) est longue et
+    // bloquante. Si le moteur tournait sur le thread principal, elle gelerait le
+    // serveur HTTP : /healthz et le suivi GET /api/v1/updates/<id> deviendraient
+    // muets pendant toute la mise a jour, exactement au moment ou un superviseur
+    // veut lire la progression. On deporte donc le moteur sur un thread worker.
+    // Les connexions restent Qt::QueuedConnection : le signal est emis sur le
+    // thread HTTP, le slot s'execute sur le worker (affinite du moteur). Le journal
+    // partage (OperationStore) est protege par mutex, seul point de contact.
     morfupdate::UpdateEngine engine(config, &operations, stateDirectory());
+    QThread worker;
+    engine.moveToThread(&worker);
+    worker.start();
     QObject::connect(&api, &morfupdate::LocalApiServer::operationQueued,
                      &engine, &morfupdate::UpdateEngine::run, Qt::QueuedConnection);
     QObject::connect(&api, &morfupdate::LocalApiServer::restartQueued,
                      &engine, &morfupdate::UpdateEngine::restart, Qt::QueuedConnection);
     QTextStream(stdout) << "morfUpdate agent listening on 127.0.0.1:" << api.port() << '\n';
-    return app.exec();
+    const int code = app.exec();
+    // Arret propre : on stoppe la boucle du worker et on l'attend avant que
+    // `engine` et `worker` ne soient detruits en fin de portee.
+    worker.quit();
+    worker.wait();
+    return code;
 }

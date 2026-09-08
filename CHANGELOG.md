@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project follows [Semantic Versioning](https://semver.org/) (the `VERSION`
 file at the repository root).
 
+## [0.5.3] - 2026-09-08
+
+### Changed
+
+- **The install now runs on a worker thread, so the agent stays responsive during a
+  long update.** The engine used to execute on the main event loop: while `dpkg` ran,
+  the service was restarted and `/healthz` was polled, the HTTP server was frozen -
+  `GET /healthz` and the progress endpoint `GET /api/v1/updates/<id>` went silent for
+  the whole install, exactly when a supervisor wants to read progress. A poll during
+  the install returned a transport failure, not a state. The engine is now moved to a
+  dedicated `QThread` (`moveToThread` + `Qt::QueuedConnection`); `run` and `restart`
+  execute off the HTTP thread, so the agent answers `/healthz` and reports live
+  progress (queued -> downloading -> verifying -> installing -> restarting ->
+  health_check -> succeeded) throughout.
+- **`OperationStore` is now thread-safe.** The journal is the single point of contact
+  between the HTTP thread (which creates operations and serves their status) and the
+  worker thread (which advances them). Every read and write is guarded by a
+  `QRecursiveMutex`, and `active()`/`find()` return a snapshot by value
+  (`std::optional<UpdateOperation>`) rather than a pointer into the shared hash, so a
+  reader never races a concurrent writer.
+
 ## [0.5.2] - 2026-09-08
 
 ### Fixed
