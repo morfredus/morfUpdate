@@ -221,9 +221,18 @@ int main(int argc, char** argv) {
         return installBundle(unpack, service);
 
     // --- install-deb : installation du paquet puis (re)démarrage ---
+    // dpkg TOTALEMENT non interactif. DEBIAN_FRONTEND=noninteractive (voir run())
+    // ne suffit PAS : il pilote debconf, pas le prompt conffile de dpkg lui-meme.
+    // Sans --force-conf*, un .deb dont un conffile a change sur disque (ex.
+    // /etc/morfsystem/<svc>/<svc>.json) declenche « conffile (Y/I/N/O/D/Z) ? » et
+    // dpkg ATTEND sur stdin (absent cote helper) -> mise a jour distante figee,
+    // verrou dpkg tenu, agent gele. Politique deterministe : garder la config en
+    // place (--force-confold) et n'utiliser le defaut du paquet que pour un conffile
+    // NON modifie (--force-confdef). Un update distant ne doit jamais attendre un humain.
     QString detail;
     if (!run(QStringLiteral("/usr/bin/dpkg"),
-             {QStringLiteral("--install"), artifact}, &detail))
+             {QStringLiteral("--force-confdef"), QStringLiteral("--force-confold"),
+              QStringLiteral("--install"), artifact}, &detail))
         return refuse(QStringLiteral("dpkg failed: ") + detail);
     // L'ancien prerm faisait disable --now a chaque upgrade. Si le postinst
     // avale un echec d'enable (--now || true), le service reste eteint : cas vu

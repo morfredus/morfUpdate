@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project follows [Semantic Versioning](https://semver.org/) (the `VERSION`
 file at the repository root).
 
+## [0.5.2] - 2026-09-08
+
+### Fixed
+
+- **`dpkg` is now fully non-interactive during install - a remote update can never
+  wait for someone at the Pi.** The helper already set
+  `DEBIAN_FRONTEND=noninteractive`, but that governs debconf, not dpkg's own conffile
+  prompt: a `.deb` whose conffile changed on disk (e.g.
+  `/etc/morfsystem/<svc>/<svc>.json`) triggered `conffile (Y/I/N/O/D/Z)?` and dpkg
+  blocked on stdin (absent in the helper) - the remote update froze at "installing",
+  holding the dpkg lock and freezing the agent. `dpkg --install` now runs with
+  `--force-confdef --force-confold`: keep the config in place, use the package default
+  only for an unmodified conffile. Deterministic, never waits for a human. (The
+  broader question of whether the runtime config should be a dpkg conffile at all is
+  separate and deferred.)
+
+## [0.5.1] - 2026-09-08
+
+### Fixed
+
+- **The target platform is now the source of truth for `service_manager` and
+  `app_dir`.** The shipped `config/morfupdate.example.json` hard-coded every target
+  to Windows values (`service_manager: "task"`, `app_dir: "%ProgramData%/..."`) and
+  was deployed as-is on Linux Pis, so `AgentConfig` accepted those Windows values
+  verbatim - a legit update on a healthy ARM64 host then failed because the agent
+  thought it managed a Windows scheduled task under `%ProgramData%`. `AgentConfig`
+  now **derives** these two fields from the OS it runs on (Linux => `systemd` +
+  `/opt/<service>`; Windows => scheduled task or scm + `%ProgramData%/<service>`),
+  ignoring whatever the config carries for them. A target declares only the
+  cross-platform *what* (project, service, repository, health_url); the host decides
+  the *how*. The example config no longer carries `app_dir`/`service_manager`, so one
+  config works on Windows, Linux x64 and ARM64. Fixes the update button failing on
+  the Pis with a Windows-configured agent.
+
 ## [0.5.0] - 2026-09-06
 
 ### Added
