@@ -22,5 +22,6 @@
       "dest": "morfupdate.json"
     }
   ],
-  "status_url": "http://127.0.0.1:8794/healthz"
+  "status_url": "http://127.0.0.1:8794/healthz",
+  "on_demand": true
 }
