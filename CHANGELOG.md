@@ -6,6 +6,68 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project follows [Semantic Versioning](https://semver.org/) (the `VERSION`
 file at the repository root).
 
+## [0.8.0] - 2026-09-10
+
+### Added — opt-in self-update by detached succession (stage 2, Linux)
+
+- morfUpdate can now update **itself**, off by default. It is enabled by declaring
+  a `morfUpdate` target with `"self": true` (project `morfUpdate`, service
+  `morfupdate`, repo `morfredus/morfUpdate`, health `http://127.0.0.1:8794/healthz`).
+  Without that flag, the agent still refuses (historical behaviour).
+- Two-phase succession (see the evolution note): the running agent stages the new
+  package **and** the rollback package (the current version, still on GitHub),
+  verifies both, persists the operation as `Delegated`, then hands off to a
+  **detached systemd applier** (`systemd-run --collect`, outside morfupdate's
+  cgroup) which stops → installs → restarts → health-gates, and rolls back to the
+  staged previous package if the new one is unhealthy. The successor (new or
+  rolled-back old) reconciles the persisted operation from its own compiled
+  version at startup. The proven update flow for other services is untouched.
+- New privileged-helper verbs `--self-apply` (delegation via `systemd-run`) and
+  `--self-apply-run` (the detached applier: stop/install/start/health/rollback),
+  with the same guards as the other verbs (declared service, staged package under
+  the protected downloads directory, loopback health URL). The helper now links Qt
+  Network for the `/healthz` gate.
+- `AgentTarget.isSelf`, `OperationStore::create(..., selfUpdate)` /
+  `setSelfUpdateRefs()`, `UpdateEngine::runSelfUpdate()`, and the API populates the
+  self operation's from-version with the running `MORFUPDATE_VERSION` anchor.
+- Windows self-update is intentionally not supported yet (the applier is systemd).
+
+**Status:** compiles on Windows (MinGW) and Linux (WSL, Qt 6.4), unit tests green.
+The destructive applier path is **not yet validated on real systemd/dpkg** — to be
+exercised on the pi4dev test bench before enabling anywhere else.
+
+## [0.7.0] - 2026-09-10
+
+### Added — self-update state contract & successor reconciliation (stage 1)
+
+- First stage of the self-update design (see the workspace evolution note
+  "morfUpdate - auto-mise à jour (succession de processus)"). This freezes the
+  **state contract** before writing the destructive applier:
+  - new additive `UpdateState` values `RollbackPrepared`, `Delegated`,
+    `RolledBack`, used only on the self-update path; the existing flow for other
+    services is unchanged;
+  - `reconcileSelfUpdate()` decides a resumed self-update's terminal state from
+    the successor's own compiled version (target → `Succeeded`, start version →
+    `RolledBack`, anything else → `Failed`); installation is never assumed to be
+    success;
+  - `OperationStore::load()` no longer force-fails a non-final **self-update**
+    operation (the orchestrating process disappears by design); it is left for
+    `OperationStore::reconcileSelfUpdates()`, which the agent runs at startup. A
+    non-self interrupted operation still fails honestly.
+  - `UpdateOperation` gains `selfUpdate`, `rollbackRef`, `stagedRef`, serialized
+    additively (older journals default them).
+- Native `ctest` contract test (`test/contract_test.cpp`) covering the states,
+  the reconciliation function and the load/reconcile integration.
+- The applier (detached systemd unit, rollback stash, `UpdateEngine` self-branch)
+  is stage 2 and not yet wired: the agent still declines to update itself.
+
+### Fixed — journal rewrite could fail on Windows
+
+- `OperationStore::load()` kept the read handle open while rewriting the journal;
+  on Windows `QSaveFile` cannot atomically replace a still-open file ("access
+  denied"). The handle is now closed before the rewrite. Invisible on Linux (the
+  Pi), where renaming over an open file is allowed.
+
 ## [0.6.0] - 2026-09-10
 
 ### Added — platform-aware download asset selection in the update dialog

@@ -88,3 +88,10 @@ option(MORFUPDATE_BUILD_AGENT "Compiler l'agent local de mise à jour" ON)
 if(MORFUPDATE_BUILD_AGENT)
     add_subdirectory(agent)
 endif()
+
+# --- Tests (build autonome par defaut) ------------------------------------
+option(MORFUPDATE_BUILD_TESTS "Compiler les tests du contrat morfUpdate" ${_um_standalone})
+if(MORFUPDATE_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(test)
+endif()

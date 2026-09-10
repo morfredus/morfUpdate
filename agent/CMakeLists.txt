@@ -6,7 +6,7 @@ set_target_properties(morfupdate-agent PROPERTIES
 )
 
 add_executable(morfupdate-helper privileged-helper.cpp)
-target_link_libraries(morfupdate-helper PRIVATE Qt6::Core)
+target_link_libraries(morfupdate-helper PRIVATE Qt6::Core Qt6::Network)
 set_target_properties(morfupdate-helper PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/service"
 )

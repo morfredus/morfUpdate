@@ -2,7 +2,7 @@
 
 *Read in another language: **English** (this document) · [Français](README.fr.md).*
 
-[![Version](https://img.shields.io/badge/version-0.6.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue)](CHANGELOG.md)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
 ![Qt](https://img.shields.io/badge/Qt-6-41CD52?logo=qt)
 ![Build](https://img.shields.io/badge/CMake-3.21+-064F8C?logo=cmake)
@@ -106,7 +106,15 @@ In a standalone build, `morfupdate_demo` (console) and `morfupdate_widget_demo`
 requests forwarded by the local morfMonitor without a user-managed token. The
 agent accepts only a configured project and version, records an asynchronous operation, validates the GitHub release tag,
 manifest and SHA-256 before invoking the platform installer. It never accepts a
-client-provided command, URL or path, and it refuses to update itself.
+client-provided command, URL or path.
+
+By default it refuses to update **itself**. On Linux this can be enabled by
+declaring a `morfUpdate` target with `"self": true`: the agent then switches to a
+two-phase succession (it stages the new and rollback packages, hands off to a
+**detached systemd applier** outside its own cgroup, and the successor validates
+its running version and health before the operation is marked succeeded or rolled
+back). Keep it enabled only on a test bench until the path is proven on real
+hardware.
 
 Its contract and the required platform configuration are documented in
 [docs/fr/AGENT-CONTRACT.md](docs/fr/AGENT-CONTRACT.md).

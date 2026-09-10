@@ -5,15 +5,21 @@
  */
 
 #include <QCoreApplication>
+#include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QRegularExpression>
 #include <QTextStream>
+#include <QTimer>
+#include <QUrl>
 
 #ifdef Q_OS_UNIX
 #include <unistd.h>
@@ -37,6 +43,18 @@ bool declaredService(const QString& service) {
 int refuse(const QString& message) {
     QTextStream(stderr) << "morfUpdate helper refused: " << message << '\n';
     return 2;
+}
+
+// Un paquet stagé n'est acceptable que s'il existe sous le répertoire protégé de
+// l'agent et se termine par .deb. canonicalFilePath resout les liens et « .. » :
+// aucun chemin arbitraire ne peut se faufiler. Renvoie le chemin canonique, ou
+// vide si invalide.
+QString validStagedDeb(const QString& argument) {
+    const QString canonical = QFileInfo(argument).canonicalFilePath();
+    if (canonical.isEmpty() || !canonical.startsWith(QString::fromLatin1(kDownloads))
+        || !canonical.endsWith(QStringLiteral(".deb")))
+        return {};
+    return canonical;
 }
 
 bool run(const QString& program, const QStringList& arguments, QString* detail) {
@@ -146,6 +164,69 @@ int installBundle(const QString& unpack, const QString& service) {
     run(QStringLiteral("/usr/bin/rm"), {QStringLiteral("-rf"), backup}, &ignored);
     return 0;
 }
+
+// Sonde /healthz en boucle : le service vient d'etre (re)installe, il peut mettre
+// quelques secondes a ecouter. Renvoie vrai des qu'un GET rend 200. Sert de porte
+// de sante du redemarrage cote applieur, avant de valider ou de rouler en arriere.
+bool healthProbe(const QString& url) {
+    for (int attempt = 0; attempt < 15; ++attempt) {
+        if (attempt > 0) sleep(2);
+        QNetworkAccessManager manager;
+        QNetworkReply* reply = manager.get(QNetworkRequest(QUrl(url)));
+        QEventLoop loop;
+        QTimer timeout;
+        timeout.setSingleShot(true);
+        QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+        QObject::connect(&timeout, &QTimer::timeout, reply, &QNetworkReply::abort);
+        timeout.start(3000);
+        loop.exec();
+        const bool ok = reply->error() == QNetworkReply::NoError
+            && reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 200;
+        reply->deleteLater();
+        if (ok)
+            return true;
+    }
+    return false;
+}
+
+// Applieur DETACHE (deuxieme temps de la succession) : execute dans une unite
+// systemd transitoire, donc HORS du cgroup de morfupdate. Il peut donc arreter
+// morfupdate sans se suicider. Sequence : stop -> install du nouveau paquet ->
+// (re)demarrage -> porte de sante. Si un maillon lache, rollback vers l'ancien
+// paquet et redemarrage. Ne touche JAMAIS au journal d'operations : c'est le
+// successeur (neuf ou ancien restaure) qui reconcilie d'apres sa version.
+int selfApplyRun(const QString& newDeb, const QString& oldDeb, const QString& service,
+                 const QString& healthUrl) {
+    QString detail, ignored;
+    run(QStringLiteral("/usr/bin/systemctl"), {QStringLiteral("stop"), service}, &ignored);
+
+    const QStringList dpkgArgs = {QStringLiteral("--force-confdef"), QStringLiteral("--force-confold"),
+                                  QStringLiteral("--install")};
+    const bool installed = run(QStringLiteral("/usr/bin/dpkg"), dpkgArgs + QStringList{newDeb}, &detail);
+    if (installed && bringUp(service, &detail) && healthProbe(healthUrl))
+        return 0;  // succes : le nouveau morfUpdate est sain
+
+    // Rollback : reinstaller l'ancien paquet, relancer. Personne ne lit ce code de
+    // sortie ; l'ancien morfUpdate qui redemarre reconciliera l'operation en
+    // RolledBack d'apres sa propre version.
+    run(QStringLiteral("/usr/bin/dpkg"), dpkgArgs + QStringList{oldDeb}, &ignored);
+    bringUp(service, &ignored);
+    return 3;
+}
+
+// Premier temps : deleguer. Deja root ici. Lance l'applieur ci-dessus dans une
+// unite systemd transitoire (--collect : nettoyee a la sortie). systemd-run rend
+// la main aussitot ; morfupdate peut alors etre arrete par l'applieur.
+int selfApply(const QString& newDeb, const QString& oldDeb, const QString& service,
+              const QString& healthUrl) {
+    const QString self = QStringLiteral("/usr/lib/morfsystem/morfupdate/morfupdate-helper");
+    QString detail;
+    if (!run(QStringLiteral("/usr/bin/systemd-run"),
+             {QStringLiteral("--collect"), QStringLiteral("--quiet"), self,
+              QStringLiteral("--self-apply-run"), newDeb, oldDeb, service, healthUrl}, &detail))
+        return refuse(QStringLiteral("cannot launch detached applier: ") + detail);
+    return 0;
+}
 #endif  // Q_OS_UNIX
 
 } // namespace
@@ -178,6 +259,34 @@ int main(int argc, char** argv) {
         if (setgid(0) != 0 || setuid(0) != 0)
             return refuse(QStringLiteral("cannot assume real root"));
         return restartService(service);
+    }
+
+    // Auto-mise a jour, deux verbes de meme forme :
+    //   --self-apply     <newDeb> <oldDeb> <service> <healthUrl>  (delegation)
+    //   --self-apply-run <newDeb> <oldDeb> <service> <healthUrl>  (applieur detache)
+    // Le premier lance le second dans une unite systemd transitoire. Memes barrieres
+    // que les autres verbes : service declare, paquets sous le repertoire protege,
+    // URL de sante en boucle locale. Passage a root SEULEMENT apres validation.
+    if (arguments.value(1) == QStringLiteral("--self-apply")
+        || arguments.value(1) == QStringLiteral("--self-apply-run")) {
+        if (arguments.size() != 6)
+            return refuse(QStringLiteral(
+                "usage: --self-apply|--self-apply-run <newDeb> <oldDeb> <service> <healthUrl>"));
+        const QString newDeb = validStagedDeb(arguments.at(2));
+        const QString oldDeb = validStagedDeb(arguments.at(3));
+        const QString service = arguments.at(4);
+        const QString healthUrl = arguments.at(5);
+        if (newDeb.isEmpty() || oldDeb.isEmpty())
+            return refuse(QStringLiteral("staged package path is invalid"));
+        if (!unit.match(service).hasMatch() || !declaredService(service))
+            return refuse(QStringLiteral("declared service is invalid"));
+        if (!healthUrl.startsWith(QStringLiteral("http://127.0.0.1:")))
+            return refuse(QStringLiteral("health url must be loopback"));
+        if (setgid(0) != 0 || setuid(0) != 0)
+            return refuse(QStringLiteral("cannot assume real root"));
+        if (arguments.value(1) == QStringLiteral("--self-apply-run"))
+            return selfApplyRun(newDeb, oldDeb, service, healthUrl);
+        return selfApply(newDeb, oldDeb, service, healthUrl);
     }
 
     // Deux verbes, même forme : <verbe> <source> <service>.

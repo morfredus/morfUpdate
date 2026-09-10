@@ -69,6 +69,19 @@ int main(int argc, char** argv) {
         errorLine(QStringLiteral("morfUpdate operation journal refused: ") + error);
         return 4;
     }
+    // Reprise d'une eventuelle auto-mise a jour : ce processus EST le successeur.
+    // Il tranche d'apres sa propre version compilee (cible -> succes, version de
+    // depart -> rollback restaure), sans jamais presumer que l'install a reussi.
+    // Fait avant de servir l'API : aucune nouvelle operation ne peut demarrer
+    // tant que le verdict n'est pas rendu.
+    const int reconciled = operations.reconcileSelfUpdates(QStringLiteral(MORFUPDATE_VERSION), &error);
+    if (reconciled < 0) {
+        errorLine(QStringLiteral("morfUpdate could not reconcile a self-update: ") + error);
+        return 4;
+    }
+    if (reconciled > 0)
+        QTextStream(stdout) << "morfUpdate reconciled " << reconciled
+                            << " self-update operation(s) at startup\n";
     morfupdate::LocalApiServer api(config, &operations);
     if (!api.start(&error)) {
         errorLine(QStringLiteral("morfUpdate API refused: ") + error);
