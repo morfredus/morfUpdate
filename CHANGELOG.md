@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project follows [Semantic Versioning](https://semver.org/) (the `VERSION`
 file at the repository root).
 
+## [0.6.0] - 2026-09-10
+
+### Added — platform-aware download asset selection in the update dialog
+
+- `UpdateDialog` no longer offers `info.assets.first()` for download, which was
+  often `checksums.sha256` (alphabetically ahead of the real binary). A new inline
+  helper `selectAssetForCurrentPlatform()` (in `ReleaseInfo.h`) scores each asset by
+  OS and CPU architecture and picks the native binary: `.zip`/`.exe`/`.msi` on
+  Windows, `.deb` (matching arch) then `.AppImage`/`.tar.gz` on Linux, `.dmg`/`.pkg`
+  on macOS. Auxiliary files (checksums, signatures, manifests, notes) are excluded
+  via `isAuxiliaryReleaseAsset()`. When nothing matches, the dialog offers only the
+  release page instead of a random file.
+- Header-only, so every vendored consumer picks it up on resync with no CMake change.
+
 ## [0.5.3] - 2026-09-08
 
 ### Changed
