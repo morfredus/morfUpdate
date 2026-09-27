@@ -6,9 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project follows [Semantic Versioning](https://semver.org/) (the `VERSION`
 file at the repository root).
 
+## [0.8.2] - 2026-09-27
+
+### Changed
+
+- Re-vendored morfDeploy to 0.20.7 (dead-code removal and punctuation only; no
+  behaviour change).
+
+## [0.8.1] - 2026-09-27
+
+### Fixed
+
+- **`docs/fr/AGENT-CONTRACT.md` described the first milestone.** It still required a
+  Bearer token (removed in 0.4.0), said the agent refused its own update and
+  announced no rollback. It now documents the token-free loopback access,
+  `POST /api/v1/restart`, the `package`/`source-bundle` install strategies, the
+  opt-in self-update succession and its states (`rollback_prepared`, `delegated`,
+  `rolled_back`), and the full list of privileged-helper verbs.
+- **The French README had no word on the local agent** and kept a "no auto-update"
+  design section; it now mirrors the English one. `docs/fr/ARCHITECTURE.md` states
+  the real boundary: the library never installs, the agent does. The contract is
+  indexed in both French doc lists.
+
+### Changed
+
+- Em dashes replaced by `-` in the project's own files.
+
 ## [0.8.0] - 2026-09-10
 
-### Added — opt-in self-update by detached succession (stage 2, Linux)
+### Added - opt-in self-update by detached succession (stage 2, Linux)
 
 - morfUpdate can now update **itself**, off by default. It is enabled by declaring
   a `morfUpdate` target with `"self": true` (project `morfUpdate`, service
@@ -33,12 +59,12 @@ file at the repository root).
 - Windows self-update is intentionally not supported yet (the applier is systemd).
 
 **Status:** compiles on Windows (MinGW) and Linux (WSL, Qt 6.4), unit tests green.
-The destructive applier path is **not yet validated on real systemd/dpkg** — to be
+The destructive applier path is **not yet validated on real systemd/dpkg** - to be
 exercised on the pi4dev test bench before enabling anywhere else.
 
 ## [0.7.0] - 2026-09-10
 
-### Added — self-update state contract & successor reconciliation (stage 1)
+### Added - self-update state contract & successor reconciliation (stage 1)
 
 - First stage of the self-update design (see the workspace evolution note
   "morfUpdate - auto-mise à jour (succession de processus)"). This freezes the
@@ -61,7 +87,7 @@ exercised on the pi4dev test bench before enabling anywhere else.
 - The applier (detached systemd unit, rollback stash, `UpdateEngine` self-branch)
   is stage 2 and not yet wired: the agent still declines to update itself.
 
-### Fixed — journal rewrite could fail on Windows
+### Fixed - journal rewrite could fail on Windows
 
 - `OperationStore::load()` kept the read handle open while rewriting the journal;
   on Windows `QSaveFile` cannot atomically replace a still-open file ("access
@@ -70,7 +96,7 @@ exercised on the pi4dev test bench before enabling anywhere else.
 
 ## [0.6.0] - 2026-09-10
 
-### Added — platform-aware download asset selection in the update dialog
+### Added - platform-aware download asset selection in the update dialog
 
 - `UpdateDialog` no longer offers `info.assets.first()` for download, which was
   often `checksums.sha256` (alphabetically ahead of the real binary). A new inline

@@ -1,5 +1,5 @@
 /*
- * morfUpdate — apercu du dialogue de mise a jour
+ * morfUpdate - apercu du dialogue de mise a jour
  * Copyright (C) 2026 morfredus
  * SPDX-License-Identifier: GPL-3.0-only
  *

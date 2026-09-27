@@ -78,9 +78,9 @@ affiche l'`UpdateDialog`. Le paramètre `silentIfUpToDate` distingue la
 vérification **au démarrage** (silencieuse) de la vérification **manuelle**
 (affiche aussi « à jour » / les erreurs).
 
-## Choix de conception : pas d'auto-update
+## Choix de conception : la bibliothèque n'installe rien
 
-Le téléchargement et l'installation restent à la main de l'utilisateur. Un
-installeur automatique n'a de sens qu'avec **vérification de signature** ; les
-`assets` sont déjà exposés dans `ReleaseInfo` pour l'ajouter proprement plus
-tard.
+La bibliothèque et son dialogue détectent et signalent ; ils n'installent jamais.
+L'installation relève de l'**agent local** (`morfupdate-agent`), qui vérifie
+provenance, manifeste et SHA-256 avant d'agir, et qui peut même se remplacer
+lui-même par succession détachée (voir [AGENT-CONTRACT.md](AGENT-CONTRACT.md)).

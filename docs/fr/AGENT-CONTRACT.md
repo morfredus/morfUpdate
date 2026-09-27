@@ -13,21 +13,24 @@ provenance.
 
 ## Accès et authentification
 
-L'API d'écriture écoute par défaut uniquement sur `127.0.0.1:8794`. Chaque
-requête `POST` doit présenter le jeton configuré dans l'en-tête HTTP :
+L'API écoute uniquement sur `127.0.0.1:8794` : seule la machine elle-même peut
+l'atteindre. Depuis la 0.4.0, il n'y a **plus de jeton** : le périmètre de
+sécurité est la boucle locale, plus la liste blanche des cibles, la provenance,
+le SHA-256 et la plateforme, tous contrôlés à chaque demande. En pratique, c'est
+morfMonitor, sur la même machine, qui relaie les demandes venues de son
+interface Web (`POST /api/updates`, `POST /api/restart`).
 
-```text
-Authorization: Bearer <jeton>
-```
+`GET /healthz` et `GET /status` restent lisibles sans condition : un superviseur
+local doit pouvoir distinguer un agent arrêté d'un agent qui refuse une demande.
 
-Un jeton absent, invalide ou une requête non locale reçoit `401` ou `403`.
-L'exposition à une autre machine est hors du premier contrat : elle exigera un
-jumelage ou mTLS, jamais la réutilisation d'un bearer token sur le LAN.
+L'exposition à une autre machine est hors contrat : elle exigera un jumelage ou
+mTLS, jamais un secret partagé sur le LAN.
 
 ## Configuration initiale
 
 Le paquet démarre avec une liste `targets` qui autorise **tous les services
-du parc** (sauf `morfUpdate`, qui refuse de se mettre à jour lui-même).
+du parc**. `morfUpdate` lui-même n'est accepté que si sa cible porte
+`"self": true` (voir « Auto-mise à jour »).
 Chaque cible déclare son projet GitHub, son unité, son dépôt, son URL
 `/healthz` et, sous Windows, `app_dir` plus `service_manager`.
 
@@ -35,16 +38,10 @@ Chaque cible déclare son projet GitHub, son unité, son dépôt, son URL
 présente. Une machine qui n'avait qu'une cible de test (souvent
 `morfCollector`) garde cette liste jusqu'à un `config push --force`.
 
-Sous Windows, le jeton est placé sous
-`%ProgramData%/morfsystem/morfupdate/state/` et son ACL est limitée à `SYSTEM`.
-Les tâches de service morfUpdate et morfMonitor exécutées sous cette identité
-peuvent donc collaborer sans rendre ce secret lisible par un utilisateur.
-
 ## Demander une mise à jour
 
 ```http
 POST /api/v1/updates
-Authorization: Bearer <jeton>
 Content-Type: application/json
 
 {
@@ -55,8 +52,8 @@ Content-Type: application/json
 
 La demande ne contient ni URL, ni chemin, ni commande. `project` doit être une
 entrée déclarée dans la configuration locale de l'agent. `version` doit désigner
-une release publiée de ce projet. L'agent refuse sa propre mise à jour dans ce
-premier jalon.
+une release publiée de ce projet. Une demande visant `morfUpdate` reçoit
+`409 Conflict` tant que sa cible n'est pas déclarée `"self": true`.
 
 Réponse immédiate :
 
@@ -77,8 +74,10 @@ Une seule opération peut être active par machine. Une seconde demande reçoit
 
 ```http
 GET /api/v1/updates/<id>
-Authorization: Bearer <jeton>
 ```
+
+Le journal est commun aux mises à jour et aux relances : `GET /api/v1/restart/<id>`
+renvoie la même chose.
 
 ```json
 {
@@ -97,10 +96,62 @@ Authorization: Bearer <jeton>
 États transitifs : `queued`, `downloading`, `verifying`, `installing`,
 `restarting`, `health_check`.
 
-États finaux : `succeeded`, `rejected`, `failed`.
+États finaux : `succeeded`, `rejected`, `failed`, et pour l'auto-mise à jour
+`rolled_back`.
+
+États propres à l'auto-mise à jour : `rollback_prepared` (nouveau paquet et paquet
+de retour vérifiés et mis de côté), puis `delegated` (la main est passée à
+l'applieur détaché).
 
 L'opération est conservée dans le répertoire d'état de l'agent. Un échec garde
-son diagnostic réel. Aucun rollback automatique n'est annoncé.
+son diagnostic réel. Pour une mise à jour ordinaire, aucun retour arrière
+automatique n'a lieu ; l'auto-mise à jour et `source-bundle` en prévoient un.
+
+## Relancer un service
+
+```http
+POST /api/v1/restart
+Content-Type: application/json
+
+{ "project": "morfCollector" }
+```
+
+Action bornée, sans version ni source : `project` doit être une cible déclarée,
+et le nom de l'unité systemd vient de la configuration, jamais du client. Elle
+partage le verrou des mises à jour (`409` si une opération est active) et se suit
+par son identifiant. Linux seulement pour l'instant.
+
+## Stratégies d'installation
+
+Le `manifest.json` de la release déclare un bloc `install` :
+
+- `package` (défaut, rétro-compatible) : l'asset est un paquet compilé (`.deb` ou
+  `.zip`), installé comme décrit dans « Exécuteurs ».
+- `source-bundle` (projet non compilé, par exemple morfDashboard) : l'asset est
+  une archive `.tar.gz` des fichiers applicatifs. L'agent l'inspecte (aucun chemin
+  absolu ni `..`), l'extrait **sans privilège**, vérifie que son fichier `VERSION`
+  correspond à la version demandée, puis confie au helper l'échange atomique du
+  répertoire applicatif, avec retour arrière. `/etc` et `/var/lib` sont préservés.
+  Linux seulement.
+
+Un asset dont le format ne correspond pas à la stratégie déclarée est refusé.
+
+## Auto-mise à jour (Linux, désactivée par défaut)
+
+Un agent ne peut pas constater lui-même le succès de son propre remplacement. Une
+cible `morfUpdate` déclarée `"self": true` déclenche donc une succession en deux
+temps :
+
+1. l'agent télécharge et vérifie le nouveau paquet **et** le paquet de la version
+   en cours (le retour), persiste l'opération en `delegated`, puis lance un
+   applieur détaché (`systemd-run`, hors du cgroup de morfupdate) ;
+2. l'applieur arrête, installe, redémarre et interroge `/healthz` ; si la nouvelle
+   version ne répond pas, il réinstalle l'ancienne ;
+3. au démarrage, l'agent qui tourne (nouveau ou ancien) solde l'opération d'après
+   sa propre version : `succeeded` ou `rolled_back`.
+
+Ce chemin n'est pas encore validé sur un vrai systemd : le garder sur le banc de
+test (pi4dev) tant qu'il n'est pas éprouvé. Non disponible sous Windows.
 
 ## Validation obligatoire
 
@@ -114,10 +165,12 @@ Avant toute élévation de privilèges, l'agent contrôle :
 
 Sous Linux, le helper privilégié est un second exécutable, installé hors de
 `/opt`, appartenant à `root` et seulement exécutable par le compte morfUpdate.
-Il accepte exclusivement `--install-deb <artifact> <service>` : l'artefact doit
-être un `.deb` situé sous le répertoire de téléchargements propre à l'agent et
-le service doit figurer dans la configuration root-owned. Il ne reçoit ni
-données HTTP, ni URL, ni commande.
+Il n'accepte qu'une liste fermée de verbes : `--install-deb <artefact> <service>`,
+`--install-bundle <répertoire> <service>`, `--restart <service>`, et pour
+l'auto-mise à jour `--self-apply` / `--self-apply-run`. Les fichiers doivent se
+trouver sous le répertoire de téléchargements propre à l'agent, et le service
+doit figurer dans la configuration root-owned. Il ne reçoit ni données HTTP, ni
+URL, ni commande.
 
 ## Exécuteurs
 
