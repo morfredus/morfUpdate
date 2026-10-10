@@ -14,6 +14,10 @@ Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
+# VOLONTAIREMENT NON DURCI (etape D de l'hygiene, 2026-10-10) : morfUpdate delegue les
+# operations privilegiees a un helper setuid (dpkg, systemctl, echange /opt). NoNewPrivileges
+# annulerait le setuid ; ProtectSystem=strict rendrait /usr et /var/lib/dpkg non inscriptibles
+# pour le helper. Ne pas ajouter ces directives sans avoir repense le helper.
 
 [Install]
 WantedBy=multi-user.target
