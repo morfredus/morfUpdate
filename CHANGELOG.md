@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project follows [Semantic Versioning](https://semver.org/) (the `VERSION`
 file at the repository root).
 
+## [0.9.0] - 2026-11-07
+
+### Security
+
+- **Local API**: the `Host` header must be `127.0.0.1` or `localhost` (DNS rebinding), and write
+  requests whose `Origin` differs from `Host` are refused with `403 cross_origin_forbidden`
+  (CSRF). The server still emits no CORS header and does not answer `OPTIONS`.
+- **Downgrade protection**: a request for a version that is not newer than the installed one is
+  refused (`409` for morfUpdate itself, a failed operation for the other services, whose
+  installed version is read from their `/status`). `"allow_downgrade": true` in the
+  `POST /api/v1/updates` body overrides it explicitly. An unreadable installed version does not
+  block the update.
+- **Privileged helper**: `dpkg` and `systemctl` run with a minimal imposed environment instead of
+  the caller's, every subprocess has a timeout (no more `waitForFinished(-1)`), and the health URL
+  is checked with `QUrl` (scheme `http`, host exactly `127.0.0.1`, explicit port, no user info)
+  instead of a prefix test that `http://127.0.0.1:80@evil.example/` bypassed. The health probe no
+  longer follows redirects.
+- Source bundles (and Windows ZIP archives) containing a symbolic link, hard link or special file
+  are refused before extraction. Identifier and checksum patterns are now strictly anchored.
+
+### Fixed
+
+- Windows install: when the application directory cannot be swapped after the service was
+  stopped, the previous installation is restored and the service restarted.
+- An invalid entry in `operations.json` is skipped (and reported on stderr) instead of preventing
+  the whole service from starting.
+- Subprocesses of the update engine have a timeout instead of waiting forever.
+
+### Notes
+
+- The helper does not re-verify the SHA-256 of the staged `.deb`: the expected hash would come
+  from the same unprivileged caller that wrote the file, so the check would add no protection.
+  A real fix needs a root-owned staging area or a manifest read by the helper itself.
+
 ## [0.8.6] - 2026-10-10
 
 ### Changed

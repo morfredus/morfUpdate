@@ -9,6 +9,9 @@
  */
 
 #include "morfupdate/OperationStore.h"
+#include "morfupdate/ReleaseValidator.h"
+#include "morfupdate/RequestGuard.h"
+#include "morfupdate/Version.h"
 #include "morfupdate/UpdateOperation.h"
 
 #include <QCoreApplication>
@@ -158,6 +161,59 @@ void testNonSelfInterruptionStillFails() {
     CHECK(store.reconcileSelfUpdates(QStringLiteral("0.7.0")) == 0);
 }
 
+// -- D. Revue C++ 2026-11-07 : fonctions pures de securite -------------------
+void testSecurityGuards() {
+    using namespace morfupdate;
+    // Anti-CSRF : Origin different de Host sur une ecriture = refus.
+    CHECK(!isCrossOriginWrite("POST", "", "127.0.0.1:8794"));
+    CHECK(!isCrossOriginWrite("POST", "http://127.0.0.1:8794", "127.0.0.1:8794"));
+    CHECK(isCrossOriginWrite("POST", "http://evil.example", "127.0.0.1:8794"));
+    CHECK(isCrossOriginWrite("POST", "null", "127.0.0.1:8794"));
+    CHECK(!isCrossOriginWrite("GET", "http://evil.example", "127.0.0.1:8794"));
+    // DNS rebinding : seul un Host de boucle locale passe.
+    CHECK(isLocalHost("127.0.0.1:8794"));
+    CHECK(isLocalHost("localhost:8794"));
+    CHECK(isLocalHost("LOCALHOST"));
+    CHECK(isLocalHost(""));
+    CHECK(!isLocalHost("evil.example:8794"));
+    CHECK(!isLocalHost("127.0.0.1.evil.example"));
+    CHECK(!isLocalHost("127.0.0.1:abc"));
+    // En-tetes.
+    CHECK(headerValue("GET / HTTP/1.1\r\nhost: a:1\r\nOrigin: http://b", "Host") == "a:1");
+    CHECK(headerValue("GET / HTTP/1.1\r\nhost: a:1", "Origin").isEmpty());
+    // URL de sante : l'hote reel doit etre 127.0.0.1 (pas de contournement par userinfo).
+    CHECK(isLoopbackHealthUrl(QStringLiteral("http://127.0.0.1:8790/healthz")));
+    CHECK(!isLoopbackHealthUrl(QStringLiteral("http://127.0.0.1:80@evil.example/")));
+    CHECK(!isLoopbackHealthUrl(QStringLiteral("http://evil.example:80/")));
+    CHECK(!isLoopbackHealthUrl(QStringLiteral("https://127.0.0.1:8790/healthz")));
+    CHECK(!isLoopbackHealthUrl(QStringLiteral("http://user@127.0.0.1:8790/healthz")));
+    CHECK(!isLoopbackHealthUrl(QStringLiteral("http://127.0.0.1/healthz")));
+    // Downgrade.
+    CHECK(isNotNewer(QStringLiteral("1.2.0"), QStringLiteral("1.1.9")));
+    CHECK(isNotNewer(QStringLiteral("1.2.0"), QStringLiteral("1.2.0")));
+    CHECK(!isNotNewer(QStringLiteral("1.2.0"), QStringLiteral("1.2.1")));
+    CHECK(!isNotNewer(QString(), QStringLiteral("1.0.0")));      // illisible : pas de blocage a l'aveugle
+    // Archives : liens et peripheriques refuses.
+    CHECK(!ReleaseValidator::listingHasSpecialEntry(
+        QStringLiteral("drwxr-xr-x u/g 0 d/") + QChar('\n') + QStringLiteral("-rw-r--r-- u/g 3 d/f")));
+    CHECK(ReleaseValidator::listingHasSpecialEntry(
+        QStringLiteral("lrwxrwxrwx u/g 0 d/l -> /etc/passwd")));
+    CHECK(ReleaseValidator::listingHasSpecialEntry(QStringLiteral("hrw-r--r-- u/g 0 d/h link to d/f")));
+}
+
+// Une entree illisible du journal ne bloque pas le demarrage.
+void testInvalidJournalEntryIgnored() {
+    QTemporaryDir tmp;
+    CHECK(tmp.isValid());
+    writeJournal(tmp.path(), {QJsonObject{{QStringLiteral("id"), QStringLiteral("broken")}},
+                              rawOp(QStringLiteral("good"), QStringLiteral("succeeded"), false,
+                                    QStringLiteral("1.0.0"), QStringLiteral("1.1.0"))});
+    OperationStore store(tmp.path());
+    CHECK(store.load());
+    CHECK(!store.find(QStringLiteral("broken")).has_value());
+    CHECK(store.find(QStringLiteral("good")).has_value());
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -167,6 +223,8 @@ int main(int argc, char** argv) {
     testSelfUpdateSucceeded();
     testSelfUpdateRolledBack();
     testNonSelfInterruptionStillFails();
+    testSecurityGuards();
+    testInvalidJournalEntryIgnored();
     if (g_failures == 0) {
         std::printf("morfUpdate contract test: all checks passed\n");
         return 0;

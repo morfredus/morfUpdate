@@ -21,6 +21,8 @@
 #include <QTimer>
 #include <QUrl>
 
+#include "morfupdate/RequestGuard.h"
+
 #ifdef Q_OS_UNIX
 #include <unistd.h>
 #endif
@@ -57,15 +59,38 @@ QString validStagedDeb(const QString& argument) {
     return canonical;
 }
 
-bool run(const QString& program, const QStringList& arguments, QString* detail) {
-    QProcess process;
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+// Environnement impose aux sous-processus root : jamais celui de l'appelant (PATH, LD_*,
+// DPKG_*, APT_*... controlables par le compte du service). PATH couvre les scripts
+// maintainer de dpkg ; LC_ALL=C fige la langue des messages.
+QProcessEnvironment cleanEnvironment() {
+    QProcessEnvironment env;
+    env.insert(QStringLiteral("PATH"), QStringLiteral("/usr/sbin:/usr/bin:/sbin:/bin"));
+    env.insert(QStringLiteral("LC_ALL"), QStringLiteral("C"));
     // Sans ça, dpkg peut attendre une question sur un conffile et échouer.
     env.insert(QStringLiteral("DEBIAN_FRONTEND"), QStringLiteral("noninteractive"));
-    process.setProcessEnvironment(env);
+    return env;
+}
+
+// timeoutMs : jamais d'attente infinie. dpkg (install + scripts maintainer) est le plus
+// long ; les autres commandes (systemctl, cp, mv, rm) se contentent de la valeur par defaut.
+// A l'echeance : terminate, puis kill, et l'etape est comptee en echec.
+bool run(const QString& program, const QStringList& arguments, QString* detail,
+         int timeoutMs = 300000) {
+    QProcess process;
+    process.setProcessEnvironment(cleanEnvironment());
     process.start(program, arguments);
-    if (!process.waitForStarted(10000) || !process.waitForFinished(-1)
-        || process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+    const bool started = process.waitForStarted(10000);
+    if (started && !process.waitForFinished(timeoutMs)) {
+        process.terminate();
+        if (!process.waitForFinished(5000)) {
+            process.kill();
+            process.waitForFinished(5000);
+        }
+        if (detail)
+            *detail = QStringLiteral("%1 timed out").arg(program);
+        return false;
+    }
+    if (!started || process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
         const QString err = QString::fromUtf8(process.readAllStandardError()).trimmed();
         if (detail) {
             *detail = err.isEmpty()
@@ -172,7 +197,12 @@ bool healthProbe(const QString& url) {
     for (int attempt = 0; attempt < 15; ++attempt) {
         if (attempt > 0) sleep(2);
         QNetworkAccessManager manager;
-        QNetworkReply* reply = manager.get(QNetworkRequest(QUrl(url)));
+        // Pas de redirection suivie : la sonde ne doit jamais quitter la boucle locale
+        // validee par isLoopbackHealthUrl, meme si le service repond 30x.
+        QNetworkRequest request{QUrl(url)};
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                             QNetworkRequest::ManualRedirectPolicy);
+        QNetworkReply* reply = manager.get(request);
         QEventLoop loop;
         QTimer timeout;
         timeout.setSingleShot(true);
@@ -202,14 +232,14 @@ int selfApplyRun(const QString& newDeb, const QString& oldDeb, const QString& se
 
     const QStringList dpkgArgs = {QStringLiteral("--force-confdef"), QStringLiteral("--force-confold"),
                                   QStringLiteral("--install")};
-    const bool installed = run(QStringLiteral("/usr/bin/dpkg"), dpkgArgs + QStringList{newDeb}, &detail);
+    const bool installed = run(QStringLiteral("/usr/bin/dpkg"), dpkgArgs + QStringList{newDeb}, &detail, 1800000);
     if (installed && bringUp(service, &detail) && healthProbe(healthUrl))
         return 0;  // succes : le nouveau morfUpdate est sain
 
     // Rollback : reinstaller l'ancien paquet, relancer. Personne ne lit ce code de
     // sortie ; l'ancien morfUpdate qui redemarre reconciliera l'operation en
     // RolledBack d'apres sa propre version.
-    run(QStringLiteral("/usr/bin/dpkg"), dpkgArgs + QStringList{oldDeb}, &ignored);
+    run(QStringLiteral("/usr/bin/dpkg"), dpkgArgs + QStringList{oldDeb}, &ignored, 1800000);
     bringUp(service, &ignored);
     return 3;
 }
@@ -280,7 +310,7 @@ int main(int argc, char** argv) {
             return refuse(QStringLiteral("staged package path is invalid"));
         if (!unit.match(service).hasMatch() || !declaredService(service))
             return refuse(QStringLiteral("declared service is invalid"));
-        if (!healthUrl.startsWith(QStringLiteral("http://127.0.0.1:")))
+        if (!morfupdate::isLoopbackHealthUrl(healthUrl))
             return refuse(QStringLiteral("health url must be loopback"));
         if (setgid(0) != 0 || setuid(0) != 0)
             return refuse(QStringLiteral("cannot assume real root"));
@@ -341,7 +371,7 @@ int main(int argc, char** argv) {
     QString detail;
     if (!run(QStringLiteral("/usr/bin/dpkg"),
              {QStringLiteral("--force-confdef"), QStringLiteral("--force-confold"),
-              QStringLiteral("--install"), artifact}, &detail))
+              QStringLiteral("--install"), artifact}, &detail, 1800000))
         return refuse(QStringLiteral("dpkg failed: ") + detail);
     // L'ancien prerm faisait disable --now a chaque upgrade. Si le postinst
     // avale un echec d'enable (--now || true), le service reste eteint : cas vu
