@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project follows [Semantic Versioning](https://semver.org/) (the `VERSION`
 file at the repository root).
 
+## [0.9.1] - 2026-11-10
+
+### Changed
+
+- **Update dialog and release source**: the source texts (dialog, "up to date" and error messages)
+  are now English and go through `QCoreApplication::translate("morfupdate", ...)`. A host
+  application translates them with a Qt catalog (context `morfupdate`); without one, English is
+  shown. Previously the French text was hard-coded and could not be translated.
+
 ## [0.9.0] - 2026-11-07
 
 ### Security
