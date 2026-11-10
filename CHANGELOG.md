@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project follows [Semantic Versioning](https://semver.org/) (the `VERSION`
 file at the repository root).
 
+## [0.9.2] - 2026-11-10
+
+### Changed
+
+- Windows asset selection: the installer (`.exe`) now ranks before the portable `.zip`, which stays as the fallback for releases without an installer.
+
 ## [0.9.1] - 2026-11-10
 
 ### Changed
