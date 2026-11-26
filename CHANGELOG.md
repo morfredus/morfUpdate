@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project follows [Semantic Versioning](https://semver.org/) (the `VERSION`
 file at the repository root).
 
+## [0.10.1] - 2026-11-26
+
+### Fixed
+
+- Windows package workflow: `git` is installed in the MSYS2 environment and the checkout is declared safe, so the packaging can prove the state of the sources ("build provenance is dirty=None ... Refusing to package").
+
 ## [0.10.0] - 2026-11-26
 
 ### Added
